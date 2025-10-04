@@ -3,34 +3,34 @@ package main
 import (
 	"logger-service/data"
 	"net/http"
+
+	"github.com/OneKeyCoder/UIT-Go-Backend/common/request"
+	"github.com/OneKeyCoder/UIT-Go-Backend/common/response"
 )
 
 type JSONPayload struct {
-	Name string `json:"name"`
-	Data string `json:"data"`
+	Name string `json:"name" validate:"required"`
+	Data string `json:"data" validate:"required"`
 }
 
 func (app *Config) WriteLog(w http.ResponseWriter, r *http.Request) {
-	// read json into var
 	var requestPayload JSONPayload
-	_ = app.readJSON(w, r, &requestPayload)
 
-	// insert data
+	err := request.ReadAndValidate(w, r, &requestPayload)
+	if request.HandleError(w, err) {
+		return
+	}
+
 	event := data.LogEntry{
 		Name: requestPayload.Name,
 		Data: requestPayload.Data,
 	}
 
-	err := app.Models.LogEntry.Insert(event)
+	err = app.Models.LogEntry.Insert(event)
 	if err != nil {
-		app.errorJson(w, err)
+		response.InternalServerError(w, "Failed to insert log entry")
 		return
 	}
 
-	response := jsonResponse{
-		Error:   false,
-		Message: "logged",
-	}
-
-	app.writeJson(w, http.StatusAccepted, response)
+	response.Success(w, "Logged successfully", nil)
 }

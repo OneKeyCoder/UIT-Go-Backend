@@ -1,35 +1,69 @@
 package main
 
 import (
+	"context"
 	"fmt"
-	amqp "github.com/rabbitmq/amqp091-go"
-	"log"
 	"math"
 	"net/http"
 	"os"
 	"time"
+
+	amqp "github.com/rabbitmq/amqp091-go"
+	
+	"github.com/OneKeyCoder/UIT-Go-Backend/common/logger"
+	"github.com/OneKeyCoder/UIT-Go-Backend/common/telemetry"
+	"go.uber.org/zap"
 )
 
 const webPort = "80"
 
 type Config struct {
-	Rabbit *amqp.Connection
+	Rabbit      *amqp.Connection
+	GRPCClients *GRPCClients
 }
 
 func main() {
+	// Initialize logger
+	logger.InitDefault("broker-service")
+	defer logger.Sync()
+
+	logger.Info("Starting broker service")
+
+	// Initialize tracing
+	shutdown, err := telemetry.InitTracer("broker-service", "1.0.0")
+	if err != nil {
+		logger.Error("Failed to initialize tracer", zap.Error(err))
+	} else {
+		defer func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := shutdown(ctx); err != nil {
+				logger.Error("Failed to shutdown tracer", zap.Error(err))
+			}
+		}()
+	}
+
 	// try to connect to rabbitmq
 	rabbitConn, err := connect()
 	if err != nil {
-		log.Println(err)
+		logger.Fatal("Failed to connect to RabbitMQ", zap.Error(err))
 		os.Exit(1)
 	}
 	defer rabbitConn.Close()
 
-	app := Config{
-		Rabbit: rabbitConn,
+	// Initialize gRPC clients
+	grpcClients, err := InitGRPCClients()
+	if err != nil {
+		logger.Fatal("Failed to initialize gRPC clients", zap.Error(err))
+		os.Exit(1)
 	}
 
-	log.Println("Starting broker service on port", webPort)
+	app := Config{
+		Rabbit:      rabbitConn,
+		GRPCClients: grpcClients,
+	}
+
+	logger.Info("Starting HTTP server", zap.String("port", webPort))
 
 	// define http server
 	srv := &http.Server{
@@ -40,7 +74,7 @@ func main() {
 	// Start the server
 	err = srv.ListenAndServe()
 	if err != nil {
-		log.Panic(err)
+		logger.Fatal("Server failed", zap.Error(err))
 	}
 }
 
@@ -53,21 +87,24 @@ func connect() (*amqp.Connection, error) {
 	for {
 		c, err := amqp.Dial("amqp://guest:guest@rabbitmq")
 		if err != nil {
-			fmt.Println("RabbitMQ not yet ready")
+			logger.Warn("RabbitMQ not yet ready, retrying...",
+				zap.Int64("attempt", counts+1),
+				zap.Error(err),
+			)
 			counts++
 		} else {
-			log.Println("Connected to RabbitMQ!")
+			logger.Info("Connected to RabbitMQ successfully")
 			connection = c
 			break
 		}
 
 		if counts > 5 {
-			fmt.Println(err)
+			logger.Error("Failed to connect to RabbitMQ after 5 attempts", zap.Error(err))
 			return nil, err
 		}
 
 		backOff = time.Duration(math.Pow(float64(counts), 2)) * time.Second
-		log.Println("backing off....")
+		logger.Debug("Backing off", zap.Duration("duration", backOff))
 		time.Sleep(backOff)
 		continue
 	}

@@ -2,58 +2,49 @@ package main
 
 import (
 	"broker-service/event"
-	"broker-service/logs"
 	"bytes"
-	"context"
 	"encoding/json"
-	"errors"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
-	"log"
 	"net/http"
 	"net/rpc"
-	"time"
+
+	"github.com/OneKeyCoder/UIT-Go-Backend/common/request"
+	"github.com/OneKeyCoder/UIT-Go-Backend/common/response"
 )
 
 type RequestPayload struct {
-	Action string      `json:"action"`
+	Action string      `json:"action" validate:"required"`
 	Auth   AuthPayload `json:"auth,omitempty"`
 	Log    LogPayload  `json:"log,omitempty"`
-	Mail   MailPayLoad `json:"mail,omitempty"`
+	// Mail   MailPayLoad `json:"mail,omitempty"` // Commented out - mail service not implemented yet
 }
 
-type MailPayLoad struct {
-	From    string `json:"from"`
-	To      string `json:"to"`
-	Subject string `json:"subject"`
-	Message string `json:"message"`
-}
+// MailPayLoad struct commented out - mail service not implemented yet
+// type MailPayLoad struct {
+// 	From    string `json:"from" validate:"required,email"`
+// 	To      string `json:"to" validate:"required,email"`
+// 	Subject string `json:"subject" validate:"required"`
+// 	Message string `json:"message" validate:"required"`
+// }
 
 type AuthPayload struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	Email    string `json:"email" validate:"required,email"`
+	Password string `json:"password" validate:"required,min=6"`
 }
 
 type LogPayload struct {
-	Name string `json:"name"`
-	Data string `json:"data"`
+	Name string `json:"name" validate:"required"`
+	Data string `json:"data" validate:"required"`
 }
 
 func (app *Config) Broker(w http.ResponseWriter, r *http.Request) {
-	payload := jsonResponse{
-		Error:   false,
-		Message: "Hit the broker",
-	}
-
-	_ = app.writeJson(w, http.StatusOK, payload)
+	response.Success(w, "Hit the broker", nil)
 }
 
 func (app *Config) HandleSubmission(w http.ResponseWriter, r *http.Request) {
 	var requestPayload RequestPayload
 
-	err := app.readJSON(w, r, &requestPayload)
-	if err != nil {
-		app.errorJson(w, err)
+	err := request.ReadAndValidate(w, r, &requestPayload)
+	if request.HandleError(w, err) {
 		return
 	}
 
@@ -62,148 +53,117 @@ func (app *Config) HandleSubmission(w http.ResponseWriter, r *http.Request) {
 		app.authenticate(w, requestPayload.Auth)
 	case "log":
 		app.logItemViaRPC(w, requestPayload.Log)
-	case "mail":
-		app.sendMail(w, requestPayload.Mail)
+	// case "mail": // Commented out - mail service not implemented yet
+	// 	app.sendMail(w, requestPayload.Mail)
 	default:
-		app.errorJson(w, errors.New("unknown action"))
+		response.BadRequest(w, "Unknown action")
 	}
 }
 
 func (app *Config) logItem(w http.ResponseWriter, entry LogPayload) {
 	jsonData, _ := json.MarshalIndent(entry, "", "\t")
-
 	logServiceURL := "http://logger-service/log"
 
-	request, err := http.NewRequest("POST", logServiceURL, bytes.NewBuffer(jsonData))
+	req, err := http.NewRequest("POST", logServiceURL, bytes.NewBuffer(jsonData))
 	if err != nil {
-		app.errorJson(w, err)
+		response.InternalServerError(w, "Failed to create log request")
 		return
 	}
 
-	request.Header.Set("Content-Type", "application/json")
-
+	req.Header.Set("Content-Type", "application/json")
 	client := &http.Client{}
-
-	response, err := client.Do(request)
+	resp, err := client.Do(req)
 	if err != nil {
-		app.errorJson(w, err)
+		response.InternalServerError(w, "Failed to call logger service")
 		return
 	}
-	defer response.Body.Close()
+	defer resp.Body.Close()
 
-	if response.StatusCode != http.StatusAccepted {
-		app.errorJson(w, err)
+	if resp.StatusCode != http.StatusAccepted {
+		response.InternalServerError(w, "Logger service returned error")
 		return
 	}
 
-	var payload jsonResponse
-	payload.Error = false
-	payload.Message = "logged"
-
-	app.writeJson(w, http.StatusAccepted, payload)
+	response.Success(w, "Logged successfully", nil)
 }
 
 func (app *Config) authenticate(w http.ResponseWriter, a AuthPayload) {
-	// create some json we'll send to the auth microservice
 	jsonData, _ := json.MarshalIndent(a, "", "\t")
 
-	// call the service
-	request, err := http.NewRequest("POST", "http://authentication-service/authenticate", bytes.NewBuffer(jsonData))
+	req, err := http.NewRequest("POST", "http://authentication-service/authenticate", bytes.NewBuffer(jsonData))
 	if err != nil {
-		app.errorJson(w, err)
+		response.InternalServerError(w, "Failed to create authentication request")
 		return
 	}
 
 	client := &http.Client{}
-	response, err := client.Do(request)
+	resp, err := client.Do(req)
 	if err != nil {
-		app.errorJson(w, err)
+		response.InternalServerError(w, "Failed to call authentication service")
 		return
 	}
-	defer response.Body.Close()
+	defer resp.Body.Close()
 
-	// make sure we get back the correct status code
-	if response.StatusCode == http.StatusUnauthorized {
-		app.errorJson(w, errors.New("invalid credentials"))
+	if resp.StatusCode == http.StatusUnauthorized {
+		response.Unauthorized(w, "Invalid credentials")
 		return
-	} else if response.StatusCode != http.StatusAccepted {
-		app.errorJson(w, errors.New("error calling auth service"))
+	} else if resp.StatusCode != http.StatusAccepted && resp.StatusCode != http.StatusOK {
+		response.InternalServerError(w, "Error calling authentication service")
 		return
 	}
 
-	// create a variable we'll read response.Body into
-	var jsonFromService jsonResponse
-
-	// decode the json from the auth service
-	err = json.NewDecoder(response.Body).Decode(&jsonFromService)
+	var jsonFromService response.Response
+	err = json.NewDecoder(resp.Body).Decode(&jsonFromService)
 	if err != nil {
-		app.errorJson(w, errors.New("invalid credentials"))
+		response.InternalServerError(w, "Failed to decode authentication response")
 		return
 	}
 
 	if jsonFromService.Error {
-		app.errorJson(w, err, http.StatusUnauthorized)
+		response.Unauthorized(w, jsonFromService.Message)
 		return
 	}
 
-	var payload jsonResponse
-	payload.Error = false
-	payload.Message = "Authenticated!"
-	payload.Data = jsonFromService.Data
-
-	app.writeJson(w, http.StatusAccepted, payload)
+	response.Success(w, "Authenticated successfully", jsonFromService.Data)
 }
 
-func (app *Config) sendMail(w http.ResponseWriter, msg MailPayLoad) {
-	jsonData, _ := json.MarshalIndent(msg, "", "\t")
-
-	// call the mail service
-	mailServiceURL := "http://mail-service/send"
-
-	// post to mail service
-	request, err := http.NewRequest("POST", mailServiceURL, bytes.NewBuffer(jsonData))
-	if err != nil {
-		app.errorJson(w, err)
-		return
-	}
-
-	request.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{}
-	response, err := client.Do(request)
-	if err != nil {
-		app.errorJson(w, err)
-		return
-	}
-	defer response.Body.Close()
-
-	log.Println(response.StatusCode)
-	// make sure we get back the right status code
-	if response.StatusCode != http.StatusAccepted {
-		app.errorJson(w, errors.New("error calling mail service"))
-		return
-	}
-
-	// send back json
-	var payload jsonResponse
-	payload.Error = false
-	payload.Message = "Message sent to " + msg.To
-
-	app.writeJson(w, http.StatusAccepted, payload)
-}
+// sendMail function commented out - mail service not implemented yet
+// Uncomment when mail-service is ready to use
+// func (app *Config) sendMail(w http.ResponseWriter, msg MailPayLoad) {
+// 	jsonData, _ := json.MarshalIndent(msg, "", "\t")
+// 	mailServiceURL := "http://mail-service/send"
+//
+// 	req, err := http.NewRequest("POST", mailServiceURL, bytes.NewBuffer(jsonData))
+// 	if err != nil {
+// 		response.InternalServerError(w, "Failed to create mail request")
+// 		return
+// 	}
+//
+// 	req.Header.Set("Content-Type", "application/json")
+// 	client := &http.Client{}
+// 	resp, err := client.Do(req)
+// 	if err != nil {
+// 		response.InternalServerError(w, "Failed to call mail service")
+// 		return
+// 	}
+// 	defer resp.Body.Close()
+//
+// 	if resp.StatusCode != http.StatusAccepted {
+// 		response.InternalServerError(w, "Mail service returned error")
+// 		return
+// 	}
+//
+// 	response.Success(w, "Message sent to "+msg.To, nil)
+// }
 
 func (app *Config) logEventViaRabbit(w http.ResponseWriter, l LogPayload) {
 	err := app.pushToQueue(l.Name, l.Data)
 	if err != nil {
-		app.errorJson(w, err)
+		response.InternalServerError(w, "Failed to push to queue")
 		return
 	}
 
-	var payload jsonResponse
-	payload.Error = false
-	payload.Message = "logged via RabbitMQ"
-
-	app.writeJson(w, http.StatusAccepted, payload)
+	response.Success(w, "Logged via RabbitMQ", nil)
 }
 
 func (app *Config) pushToQueue(name, msg string) error {
@@ -233,7 +193,7 @@ type RPCPayload struct {
 func (app *Config) logItemViaRPC(w http.ResponseWriter, l LogPayload) {
 	client, err := rpc.Dial("tcp", "logger-service:5001")
 	if err != nil {
-		app.errorJson(w, err)
+		response.InternalServerError(w, "Failed to connect to logger service")
 		return
 	}
 
@@ -245,52 +205,53 @@ func (app *Config) logItemViaRPC(w http.ResponseWriter, l LogPayload) {
 	var result string
 	err = client.Call("RPCServer.LogInfo", rpcPayload, &result)
 	if err != nil {
-		app.errorJson(w, err)
+		response.InternalServerError(w, "Failed to log via RPC")
 		return
 	}
 
-	payload := jsonResponse{
-		Error:   false,
-		Message: result,
-	}
-
-	app.writeJson(w, http.StatusAccepted, payload)
+	response.Success(w, result, nil)
 }
 
-func (app *Config) LogViaGRPC(w http.ResponseWriter, r *http.Request) {
-	var requestPayload RequestPayload
-
-	err := app.readJSON(w, r, &requestPayload)
+// authenticateViaGRPC handles authentication using gRPC client
+func (app *Config) authenticateViaGRPC(w http.ResponseWriter, a AuthPayload) {
+	resp, err := app.AuthenticateViaGRPC(a.Email, a.Password)
 	if err != nil {
-		app.errorJson(w, err)
+		response.Unauthorized(w, "Authentication failed")
 		return
 	}
 
-	conn, err := grpc.NewClient("logger-service:50001", grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		app.errorJson(w, err)
+	if !resp.Success {
+		response.Unauthorized(w, resp.Message)
 		return
 	}
-	defer conn.Close()
 
-	c := logs.NewLogServiceClient(conn)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-
-	_, err = c.WriteLog(ctx, &logs.LogRequest{
-		LogEntry: &logs.Log{
-			Name: requestPayload.Log.Name,
-			Data: requestPayload.Log.Data,
+	// Return the response with user info and tokens
+	payload := map[string]interface{}{
+		"message": resp.Message,
+		"user": map[string]interface{}{
+			"id":         resp.User.Id,
+			"email":      resp.User.Email,
+			"first_name": resp.User.FirstName,
+			"last_name":  resp.User.LastName,
+			"active":     resp.User.Active,
 		},
-	})
+		"tokens": map[string]interface{}{
+			"access_token":  resp.Tokens.AccessToken,
+			"refresh_token": resp.Tokens.RefreshToken,
+		},
+	}
+
+	response.Success(w, "Authenticated successfully", payload)
+}
+
+// logItemViaGRPCClient logs using the new gRPC client
+func (app *Config) logItemViaGRPCClient(w http.ResponseWriter, entry LogPayload) {
+	err := app.LogViaGRPC(entry.Name, entry.Data)
 	if err != nil {
-		app.errorJson(w, err)
+		response.InternalServerError(w, "Failed to log via gRPC")
 		return
 	}
 
-	var payLoad jsonResponse
-	payLoad.Error = false
-	payLoad.Message = "logged via gRPC"
-
-	app.writeJson(w, http.StatusAccepted, payLoad)
+	response.Success(w, "Logged via gRPC", nil)
 }
+

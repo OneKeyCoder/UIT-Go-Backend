@@ -3,60 +3,72 @@ package main
 import (
 	"context"
 	"fmt"
+	"logger-service/data"
+	"net/http"
+	"time"
+
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"log"
-	"logger-service/data"
-	"net"
-	"net/http"
-	"net/rpc"
-	"time"
+
+	"github.com/OneKeyCoder/UIT-Go-Backend/common/logger"
+	"github.com/OneKeyCoder/UIT-Go-Backend/common/telemetry"
+	"go.uber.org/zap"
 )
 
-const (
-	webPort  = "80"
-	rpcPort  = "5001"
-	mongoURL = "mongodb://mongo:27017"
-	gRpcPort = "50001"
-)
-
-var client *mongo.Client
+const webPort = "80"
 
 type Config struct {
 	Models data.Models
 }
 
+var client *mongo.Client
+
 func main() {
-	// connect to mongo
+	logger.InitDefault("logger-service")
+	defer logger.Sync()
+	logger.Info("Starting logger service")
+
+	shutdown, err := telemetry.InitTracer("logger-service", "1.0.0")
+	if err != nil {
+		logger.Error("Failed to initialize tracer", zap.Error(err))
+	} else {
+		defer func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := shutdown(ctx); err != nil {
+				logger.Error("Failed to shutdown tracer", zap.Error(err))
+			}
+		}()
+	}
+
 	mongoClient, err := connectToMongo()
 	if err != nil {
-		log.Panic(err)
+		logger.Fatal("Failed to connect to MongoDB", zap.Error(err))
 	}
-	client = mongoClient
 
-	// create a context in order to disconnect
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-
-	// close connection
 	defer func() {
-		if err = client.Disconnect(ctx); err != nil {
-			panic(err)
+		if err = mongoClient.Disconnect(ctx); err != nil {
+			logger.Error("Error disconnecting from MongoDB", zap.Error(err))
 		}
 	}()
+
+	client = mongoClient
 
 	app := Config{
 		Models: data.New(client),
 	}
 
-	// Register the RPC Server
-	err = rpc.Register(new(RPCServer))
-	go app.rpcListen()
+	go func() {
+		err := app.StartGRPCServer()
+		if err != nil {
+			logger.Fatal("gRPC server failed", zap.Error(err))
+		}
+	}()
 
-	go app.gRPCListen()
+	logger.Info("Starting HTTP server", zap.String("port", webPort))
 
-	// start web server
-	log.Println("Starting service on port", webPort)
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%s", webPort),
 		Handler: app.routes(),
@@ -64,43 +76,24 @@ func main() {
 
 	err = srv.ListenAndServe()
 	if err != nil {
-		log.Panic(err)
-	}
-}
-
-func (app *Config) rpcListen() error {
-	log.Println("Starting RPC server on port ", rpcPort)
-	listen, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%s", rpcPort))
-	if err != nil {
-		return err
-	}
-	defer listen.Close()
-
-	for {
-		rpcConn, err := listen.Accept()
-		if err != nil {
-			continue
-		}
-		go rpc.ServeConn(rpcConn)
+		logger.Fatal("Server failed", zap.Error(err))
 	}
 }
 
 func connectToMongo() (*mongo.Client, error) {
-	// create connection options
+	mongoURL := "mongodb://mongo:27017"
 	clientOptions := options.Client().ApplyURI(mongoURL)
 	clientOptions.SetAuth(options.Credential{
 		Username: "admin",
 		Password: "password",
 	})
 
-	//connect
 	c, err := mongo.Connect(context.TODO(), clientOptions)
 	if err != nil {
-		log.Println("Error connecting:", err)
+		logger.Error("MongoDB connection failed", zap.Error(err))
 		return nil, err
 	}
 
-	log.Println("Connected to mongo!")
-
+	logger.Info("Connected to MongoDB successfully")
 	return c, nil
 }

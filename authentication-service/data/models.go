@@ -4,9 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"log"
 	"time"
 
+	"github.com/OneKeyCoder/UIT-Go-Backend/common/logger"
+	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -72,7 +73,7 @@ func (u *User) GetAll() ([]*User, error) {
 			&user.UpdatedAt,
 		)
 		if err != nil {
-			log.Println("Error scanning", err)
+			logger.Error("Error scanning user row", zap.Error(err))
 			return nil, err
 		}
 

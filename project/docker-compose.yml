@@ -1,77 +1,61 @@
-version: '3'
-
 services:
-
   broker-service:
     build:
       context: ./../broker-service
       dockerfile: ./../broker-service/broker-service.dockerfile
-    restart: always
+    restart: unless-stopped
     ports:
       - "8080:80"
-    deploy:
-      mode: replicated
-      replicas: 1
+    depends_on:
+      - rabbitmq
+      - logger-service
 
   logger-service:
     build:
       context: ./../logger-service
       dockerfile: ./../logger-service/logger-service.dockerfile
-    restart: always
-    deploy:
-      mode: replicated
-      replicas: 1
-
-#  mail-service:
-#    build:
-#      context: ./../mail-service
-#      dockerfile: ./../mail-service/mail-service.dockerfile
-#    restart: always
-#    deploy:
-#      mode: replicated
-#      replicas: 1
-#    environment:
-#      MAIL_DOMAIN: localhost
-#      MAIL_HOST: mailhog
-#      MAIL_PORT: 1025
-#      MAIL_ENCRYPTION: none
-#      MAIL_USERNAME: ""
-#      MAIL_PASSWORD: ""
-#      FROM_NAME: "John Smith"
-#      FROM_ADDRESS: john.smith@example.com
+    restart: unless-stopped
+    ports:
+      - "50052:50052" # gRPC port
+    depends_on:
+      - mongo
+    environment:
+      MONGO_URL: "mongodb://admin:password@mongo:27017"
 
   authentication-service:
     build:
       context: ./../authentication-service
       dockerfile: ./../authentication-service/authentication-service.dockerfile
-    restart: always
+    restart: unless-stopped
     ports:
-      - "8081:80"
-    deploy:
-      mode: replicated
-      replicas: 1
+      - "8081:80" # HTTP port
+      - "50051:50051" # gRPC port
+    depends_on:
+      - postgres
     environment:
       DSN: "host=postgres port=5432 user=postgres password=password dbname=users sslmode=disable timezone=UTC connect_timeout=5"
+      JWT_SECRET: "your-secret-key-change-in-production"
+      JWT_EXPIRY: "24h"
+      REFRESH_TOKEN_EXPIRY: "168h"
 
   postgres:
-    image: 'postgres'
+    image: "postgres:16-alpine"
     ports:
       - "5432:5432"
-    restart: always
-    deploy:
-      mode: replicated
-      replicas: 1
+    restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
       POSTGRES_DB: users
     volumes:
       - ./db-data/postgres/:/var/lib/postgresql/data/
+      - ./init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
 
   mongo:
-    image: 'mongo'
+    image: "mongo:7-jammy"
     ports:
       - "27017:27017"
+    restart: unless-stopped
     environment:
       MONGO_INITDB_DATABASE: logs
       MONGO_INITDB_ROOT_USERNAME: admin
@@ -79,19 +63,24 @@ services:
     volumes:
       - ./db-data/mongo/:/data/db
 
-#  mailhog:
-#    image: 'mailhog/mailhog:latest'
-#    ports:
-#      - "1025:1025"
-#      - "8025:8025"
+  redis:
+    image: "redis:7-alpine"
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    command: redis-server --requirepass redispassword
+    volumes:
+      - ./db-data/redis/:/data
 
   rabbitmq:
-    image: 'rabbitmq:4.0-alpine'
+    image: "rabbitmq:3.13-management-alpine"
     ports:
       - "5672:5672"
-    deploy:
-      mode: replicated
-      replicas: 1
+      - "15672:15672"
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
     volumes:
       - ./db-data/rabbitmq/:/var/lib/rabbitmq/
 
@@ -99,6 +88,6 @@ services:
     build:
       context: ./../listener-service
       dockerfile: ./../listener-service/listener-service.dockerfile
-    deploy:
-      mode: replicated
-      replicas: 1
+    restart: unless-stopped
+    depends_on:
+      - rabbitmq
