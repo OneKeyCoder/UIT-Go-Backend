@@ -4,9 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	amqp "github.com/rabbitmq/amqp091-go"
 	"log"
 	"net/http"
+
+	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 type Consumer struct {
@@ -54,16 +55,14 @@ func (consumer *Consumer) Listen(topics []string) error {
 	}
 
 	for _, s := range topics {
-		ch.QueueBind(
+		if bindErr := ch.QueueBind(
 			q.Name,
 			s,
 			"logs_topic",
 			false,
 			nil,
-		)
-
-		if err != nil {
-			return err
+		); bindErr != nil {
+			return bindErr
 		}
 	}
 
