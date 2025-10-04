@@ -72,3 +72,13 @@ stop:
 	@echo Stopping front end...
 	@taskkill /IM "${FRONT_END_BINARY}" /F
 	@echo "Stopped front end!"
+
+setup-ide: 
+	@echo start setting up shit
+	chdir ..\broker-service && go mod download && go mod tidy
+	chdir ..\authentication-service && go mod download && go mod tidy
+	chdir ..\logger-service && go mod download && go mod tidy
+	chdir ..\listener-service && go mod download && go mod tidy
+#	chdir ..\mail-service && go mod download && go mod tidy
+	chdir ..\front-end && go mod download && go mod tidy
+	@echo done setting up shit 
