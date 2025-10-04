@@ -572,6 +572,404 @@ The system consists of **5 microservices** that work together:
 
 ---
 
+## 📊 System Architecture Diagrams
+
+### Overall System Architecture
+
+```mermaid
+graph TB
+    Client[Client/User]
+    
+    subgraph "Entry Point"
+        Broker[Broker Service<br/>Port 8080]
+    end
+    
+    subgraph "Core Services"
+        Auth[Authentication Service<br/>Port 8081]
+        Logger[Logger Service<br/>HTTP/RPC/gRPC]
+        Mail[Mail Service]
+    end
+    
+    subgraph "Background Services"
+        Listener[Listener Service]
+    end
+    
+    subgraph "Data Stores"
+        Postgres[(PostgreSQL<br/>Users DB)]
+        Mongo[(MongoDB<br/>Logs DB)]
+    end
+    
+    subgraph "Message Queue"
+        RabbitMQ[RabbitMQ<br/>Message Broker]
+    end
+    
+    subgraph "External Services"
+        SMTP[SMTP Server<br/>MailHog]
+    end
+    
+    Client -->|HTTP Request| Broker
+    Broker -->|HTTP| Auth
+    Broker -->|HTTP/RPC/gRPC| Logger
+    Broker -->|HTTP| Mail
+    Broker -->|Publish Events| RabbitMQ
+    
+    Auth -->|Query/Store| Postgres
+    Logger -->|Store Logs| Mongo
+    Mail -->|Send Email| SMTP
+    
+    RabbitMQ -->|Consume Events| Listener
+    Listener -->|HTTP| Logger
+    
+    Broker -->|HTTP Response| Client
+    
+    style Client fill:#e1f5ff
+    style Broker fill:#ffe1e1
+    style Auth fill:#fff4e1
+    style Logger fill:#e1ffe1
+    style Mail fill:#f4e1ff
+    style Listener fill:#ffe1f4
+```
+
+### Request Flow - Authentication
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Broker as Broker Service
+    participant Auth as Authentication Service
+    participant Postgres as PostgreSQL
+    participant Logger as Logger Service
+    participant Mongo as MongoDB
+
+    Client->>Broker: POST /handle<br/>{action: "auth", auth: {email, password}}
+    activate Broker
+    
+    Broker->>Auth: POST /authenticate<br/>{email, password}
+    activate Auth
+    
+    Auth->>Postgres: SELECT user WHERE email = ?
+    Postgres-->>Auth: User record
+    
+    Auth->>Auth: Verify password (bcrypt)
+    
+    alt Password valid
+        Auth->>Logger: POST /log<br/>{name: "authentication", data: "user logged in"}
+        activate Logger
+        Logger->>Mongo: INSERT log entry
+        Mongo-->>Logger: Success
+        Logger-->>Auth: Log confirmed
+        deactivate Logger
+        
+        Auth-->>Broker: 202 Accepted<br/>{error: false, data: user}
+        Broker-->>Client: 202 Accepted<br/>{error: false, message: "Authenticated!", data: user}
+    else Password invalid
+        Auth-->>Broker: 400 Bad Request<br/>{error: true, message: "invalid credentials"}
+        Broker-->>Client: 401 Unauthorized<br/>{error: true, message: "invalid credentials"}
+    end
+    
+    deactivate Auth
+    deactivate Broker
+```
+
+### Request Flow - Logging via HTTP
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Broker as Broker Service
+    participant Logger as Logger Service
+    participant Mongo as MongoDB
+
+    Client->>Broker: POST /handle<br/>{action: "log", log: {name, data}}
+    activate Broker
+    
+    Note over Broker: Routes to logItem()
+    
+    Broker->>Logger: POST /log<br/>{name: "event", data: "something happened"}
+    activate Logger
+    
+    Logger->>Logger: Parse JSON payload
+    
+    Logger->>Mongo: db.logs.insertOne({<br/>name, data, createdAt, updatedAt})
+    activate Mongo
+    Mongo-->>Logger: Insert successful
+    deactivate Mongo
+    
+    Logger-->>Broker: 202 Accepted<br/>{error: false, message: "logged"}
+    deactivate Logger
+    
+    Broker-->>Client: 202 Accepted<br/>{error: false, message: "logged"}
+    deactivate Broker
+```
+
+### Request Flow - Logging via RPC
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Broker as Broker Service
+    participant Logger as Logger Service<br/>(RPC Server)
+    participant Mongo as MongoDB
+
+    Client->>Broker: POST /handle<br/>{action: "log", log: {name, data}}
+    activate Broker
+    
+    Note over Broker: Routes to logItemViaRPC()
+    
+    Broker->>Logger: RPC Dial tcp://logger-service:5001
+    activate Logger
+    
+    Broker->>Logger: Call RPCServer.LogInfo<br/>{Name, Data}
+    
+    Logger->>Mongo: db.logs.insertOne({<br/>name, data, createdAt})
+    activate Mongo
+    Mongo-->>Logger: Insert successful
+    deactivate Mongo
+    
+    Logger-->>Broker: RPC Response<br/>"Processed payload via RPC: {name}"
+    deactivate Logger
+    
+    Broker-->>Client: 202 Accepted<br/>{error: false, message: "Processed..."}
+    deactivate Broker
+```
+
+### Request Flow - Logging via gRPC
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Broker as Broker Service
+    participant Logger as Logger Service<br/>(gRPC Server)
+    participant Mongo as MongoDB
+
+    Client->>Broker: POST /log-grpc<br/>{log: {name, data}}
+    activate Broker
+    
+    Note over Broker: Routes to LogViaGRPC()
+    
+    Broker->>Logger: gRPC Connect<br/>logger-service:50001
+    activate Logger
+    
+    Broker->>Logger: WriteLog(LogRequest{<br/>LogEntry: {name, data}})
+    
+    Logger->>Mongo: db.logs.insertOne({<br/>name, data, createdAt, updatedAt})
+    activate Mongo
+    Mongo-->>Logger: Insert successful
+    deactivate Mongo
+    
+    Logger-->>Broker: LogResponse{result: "logged!"}
+    deactivate Logger
+    
+    Broker-->>Client: 202 Accepted<br/>{error: false, message: "logged via gRPC"}
+    deactivate Broker
+```
+
+### Request Flow - Async Logging via RabbitMQ
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Broker as Broker Service
+    participant RabbitMQ as RabbitMQ<br/>(logs_topic)
+    participant Listener as Listener Service
+    participant Logger as Logger Service
+    participant Mongo as MongoDB
+
+    Client->>Broker: POST /handle<br/>{action: "log", log: {name, data}}
+    activate Broker
+    
+    Note over Broker: Routes to logEventViaRabbit()
+    
+    Broker->>Broker: Create Event Emitter
+    
+    Broker->>RabbitMQ: Publish to "logs_topic"<br/>Topic: "log.INFO"<br/>Payload: {name, data}
+    activate RabbitMQ
+    
+    Broker-->>Client: 202 Accepted<br/>{error: false, message: "logged via RabbitMQ"}
+    deactivate Broker
+    
+    Note over RabbitMQ: Message queued
+    
+    RabbitMQ->>Listener: Deliver message<br/>(subscribed to log.INFO)
+    activate Listener
+    deactivate RabbitMQ
+    
+    Listener->>Listener: handlePayload()<br/>Parse JSON
+    
+    Listener->>Logger: POST /log<br/>{name, data}
+    activate Logger
+    
+    Logger->>Mongo: db.logs.insertOne({<br/>name, data, createdAt, updatedAt})
+    activate Mongo
+    Mongo-->>Logger: Insert successful
+    deactivate Mongo
+    
+    Logger-->>Listener: 202 Accepted
+    deactivate Logger
+    deactivate Listener
+    
+    Note over Client,Mongo: Async process completes<br/>independently of client
+```
+
+### Request Flow - Send Email
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Broker as Broker Service
+    participant Mail as Mail Service
+    participant SMTP as SMTP Server<br/>(MailHog)
+
+    Client->>Broker: POST /handle<br/>{action: "mail", mail: {from, to, subject, message}}
+    activate Broker
+    
+    Note over Broker: Routes to sendMail()
+    
+    Broker->>Mail: POST /send<br/>{from, to, subject, message}
+    activate Mail
+    
+    Mail->>Mail: Build HTML template<br/>(mail.html.gohtml)
+    Mail->>Mail: Build plain text<br/>(mail.plain.gohtml)
+    Mail->>Mail: Configure SMTP client
+    
+    Mail->>SMTP: Connect & Authenticate
+    activate SMTP
+    
+    Mail->>SMTP: Send email with<br/>HTML & Plain alternatives
+    
+    SMTP-->>Mail: Email accepted
+    deactivate SMTP
+    
+    Mail-->>Broker: 202 Accepted<br/>{error: false, message: "sent to {email}"}
+    deactivate Mail
+    
+    Broker-->>Client: 202 Accepted<br/>{error: false, message: "Message sent to {email}"}
+    deactivate Broker
+```
+
+### Complete Request Lifecycle - Authentication with Logging
+
+```mermaid
+sequenceDiagram
+    participant U as User/Client
+    participant B as Broker<br/>:8080
+    participant A as Auth<br/>:8081
+    participant PG as PostgreSQL
+    participant L as Logger<br/>:80
+    participant MG as MongoDB
+
+    rect rgb(240, 248, 255)
+        Note over U,MG: User Authentication Request
+        U->>+B: POST /handle<br/>{action: "auth", auth: {email, password}}
+        B->>+A: POST /authenticate<br/>{email, password}
+        A->>PG: Query user by email
+        PG-->>A: User data + hashed password
+        A->>A: bcrypt.CompareHashAndPassword()
+    end
+    
+    rect rgb(255, 250, 240)
+        Note over A,MG: Log Authentication Event
+        A->>+L: POST /log<br/>{name: "authentication", data: "user@email logged in"}
+        L->>MG: Insert log document
+        MG-->>L: Inserted
+        L-->>-A: 202 Accepted
+    end
+    
+    rect rgb(240, 255, 240)
+        Note over U,MG: Success Response Chain
+        A-->>-B: 202 Accepted<br/>{error: false, data: {user}}
+        B-->>-U: 202 Accepted<br/>{error: false, message: "Authenticated!", data: {user}}
+    end
+```
+
+### Service Communication Matrix
+
+```mermaid
+graph LR
+    subgraph Communication Methods
+        HTTP[HTTP/REST]
+        RPC[RPC :5001]
+        GRPC[gRPC :50001]
+        MQ[RabbitMQ]
+    end
+    
+    subgraph Services
+        Broker[Broker]
+        Auth[Auth]
+        Logger[Logger]
+        Mail[Mail]
+        Listener[Listener]
+    end
+    
+    Broker -->|HTTP| Auth
+    Broker -->|HTTP| Logger
+    Broker -->|RPC| Logger
+    Broker -->|gRPC| Logger
+    Broker -->|HTTP| Mail
+    Broker -->|Publish| MQ
+    
+    Auth -->|HTTP| Logger
+    
+    MQ -->|Subscribe| Listener
+    Listener -->|HTTP| Logger
+    
+    style HTTP fill:#e1f5ff
+    style RPC fill:#ffe1e1
+    style GRPC fill:#e1ffe1
+    style MQ fill:#fff4e1
+```
+
+### Data Flow Architecture
+
+```mermaid
+flowchart TB
+    Start([User Request])
+    
+    Start --> Broker{Broker Service<br/>Request Router}
+    
+    Broker -->|action: auth| AuthFlow[Authentication Flow]
+    Broker -->|action: log| LogFlow[Logging Flow]
+    Broker -->|action: mail| MailFlow[Email Flow]
+    
+    AuthFlow --> AuthService[Auth Service]
+    AuthService --> PostgresDB[(PostgreSQL)]
+    AuthService --> LogAuth[Log Auth Event]
+    LogAuth --> LoggerHTTP[Logger via HTTP]
+    
+    LogFlow --> LogChoice{Logging Method?}
+    LogChoice -->|HTTP| LoggerHTTP
+    LogChoice -->|RPC| LoggerRPC[Logger via RPC]
+    LogChoice -->|gRPC| LoggerGRPC[Logger via gRPC]
+    LogChoice -->|Async| RabbitMQ[RabbitMQ Queue]
+    
+    RabbitMQ --> ListenerService[Listener Service]
+    ListenerService --> LoggerHTTP
+    
+    LoggerHTTP --> MongoDB[(MongoDB)]
+    LoggerRPC --> MongoDB
+    LoggerGRPC --> MongoDB
+    
+    MailFlow --> MailService[Mail Service]
+    MailService --> SMTP[SMTP Server]
+    
+    AuthService --> Response([JSON Response])
+    LoggerHTTP --> Response
+    LoggerRPC --> Response
+    LoggerGRPC --> Response
+    MailService --> Response
+    
+    Response --> End([User Receives Response])
+    
+    style Start fill:#e1f5ff
+    style Broker fill:#ffe1e1
+    style End fill:#e1ffe1
+    style PostgresDB fill:#fff4e1
+    style MongoDB fill:#fff4e1
+    style RabbitMQ fill:#f4e1ff
+```
+
+---
+
 ## 📊 Data Stores
 
 ### PostgreSQL
