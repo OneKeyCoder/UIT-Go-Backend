@@ -61,6 +61,11 @@ func ReadAndValidate(w http.ResponseWriter, r *http.Request, dst interface{}) er
 		return err
 	}
 	
+	return Validate(dst)
+}
+
+// Validate validates a struct using validation tags
+func Validate(dst interface{}) error {
 	if err := validate.Struct(dst); err != nil {
 		var validationErrors validator.ValidationErrors
 		if errors.As(err, &validationErrors) {

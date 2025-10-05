@@ -1,0 +1,261 @@
+{
+    "title": "API Gateway SLO Dashboard",
+    "tags": [
+        "slo",
+        "observability",
+        "api-gateway"
+    ],
+    "timezone": "browser",
+    "panels": [
+        {
+            "id": 1,
+            "title": "API Gateway - SLO Compliance (99.9%)",
+            "type": "stat",
+            "gridPos": {
+                "h": 8,
+                "w": 8,
+                "x": 0,
+                "y": 0
+            },
+            "targets": [
+                {
+                    "expr": "sum(rate(http_requests_total{service=\"api-gateway\", status!~\"5..\"}[5m])) / sum(rate(http_requests_total{service=\"api-gateway\"}[5m])) * 100",
+                    "legendFormat": "Success Rate %"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "percent",
+                    "decimals": 2,
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "value": 0,
+                                "color": "red"
+                            },
+                            {
+                                "value": 99,
+                                "color": "yellow"
+                            },
+                            {
+                                "value": 99.9,
+                                "color": "green"
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+        {
+            "id": 2,
+            "title": "API Gateway P95 Latency (<500ms SLO)",
+            "type": "stat",
+            "gridPos": {
+                "h": 8,
+                "w": 8,
+                "x": 8,
+                "y": 0
+            },
+            "targets": [
+                {
+                    "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{service=\"api-gateway\"}[5m])) by (le)) * 1000",
+                    "legendFormat": "P95 Latency (ms)"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "ms",
+                    "decimals": 0,
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "value": 0,
+                                "color": "green"
+                            },
+                            {
+                                "value": 500,
+                                "color": "yellow"
+                            },
+                            {
+                                "value": 1000,
+                                "color": "red"
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+        {
+            "id": 3,
+            "title": "Error Budget Remaining (99.9% SLO)",
+            "type": "stat",
+            "gridPos": {
+                "h": 8,
+                "w": 8,
+                "x": 16,
+                "y": 0
+            },
+            "targets": [
+                {
+                    "expr": "(1 - sum(rate(http_requests_total{service=\"api-gateway\", status=~\"5..\"}[5m])) / sum(rate(http_requests_total{service=\"api-gateway\"}[5m])) - 0.999) / 0.001 * 100",
+                    "legendFormat": "Error Budget %"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "percent",
+                    "min": 0,
+                    "max": 100,
+                    "decimals": 1,
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "value": 0,
+                                "color": "red"
+                            },
+                            {
+                                "value": 20,
+                                "color": "yellow"
+                            },
+                            {
+                                "value": 50,
+                                "color": "green"
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+        {
+            "id": 4,
+            "title": "Request Rate by Endpoint (API Gateway)",
+            "type": "timeseries",
+            "gridPos": {
+                "h": 9,
+                "w": 12,
+                "x": 0,
+                "y": 8
+            },
+            "targets": [
+                {
+                    "expr": "sum(rate(http_requests_total{service=\"api-gateway\", path=\"/handle\"}[5m]))",
+                    "legendFormat": "/handle (Orchestration)"
+                },
+                {
+                    "expr": "sum(rate(http_requests_total{service=\"api-gateway\", path=\"/grpc/auth\"}[5m]))",
+                    "legendFormat": "/grpc/auth"
+                },
+                {
+                    "expr": "sum(rate(http_requests_total{service=\"api-gateway\", path=\"/grpc/log\"}[5m]))",
+                    "legendFormat": "/grpc/log"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "reqps"
+                }
+            }
+        },
+        {
+            "id": 5,
+            "title": "Error Rate by Status Code (API Gateway)",
+            "type": "timeseries",
+            "gridPos": {
+                "h": 9,
+                "w": 12,
+                "x": 12,
+                "y": 8
+            },
+            "targets": [
+                {
+                    "expr": "sum(rate(http_requests_total{service=\"api-gateway\", status=~\"2..\"}[5m]))",
+                    "legendFormat": "2xx Success"
+                },
+                {
+                    "expr": "sum(rate(http_requests_total{service=\"api-gateway\", status=~\"4..\"}[5m]))",
+                    "legendFormat": "4xx Client Error"
+                },
+                {
+                    "expr": "sum(rate(http_requests_total{service=\"api-gateway\", status=~\"5..\"}[5m]))",
+                    "legendFormat": "5xx Server Error"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "reqps"
+                }
+            }
+        },
+        {
+            "id": 6,
+            "title": "Latency Distribution (API Gateway)",
+            "type": "heatmap",
+            "gridPos": {
+                "h": 9,
+                "w": 24,
+                "x": 0,
+                "y": 17
+            },
+            "targets": [
+                {
+                    "expr": "sum(rate(http_request_duration_seconds_bucket{service=\"api-gateway\"}[5m])) by (le)",
+                    "legendFormat": "{{le}}",
+                    "format": "heatmap"
+                }
+            ]
+        },
+        {
+            "id": 7,
+            "title": "HTTP Status Codes (API Gateway)",
+            "type": "piechart",
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 26
+            },
+            "targets": [
+                {
+                    "expr": "sum(rate(http_requests_total{service=\"api-gateway\", status=~\"2..\"}[5m]))",
+                    "legendFormat": "2xx Success"
+                },
+                {
+                    "expr": "sum(rate(http_requests_total{service=\"api-gateway\", status=~\"4..\"}[5m]))",
+                    "legendFormat": "4xx Client Error"
+                },
+                {
+                    "expr": "sum(rate(http_requests_total{service=\"api-gateway\", status=~\"5..\"}[5m]))",
+                    "legendFormat": "5xx Server Error"
+                }
+            ]
+        },
+        {
+            "id": 8,
+            "title": "In-Flight Requests (API Gateway)",
+            "type": "timeseries",
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 26
+            },
+            "targets": [
+                {
+                    "expr": "http_requests_in_flight{service=\"api-gateway\"}",
+                    "legendFormat": "In-Flight Requests"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "short"
+                }
+            }
+        }
+    ],
+    "refresh": "30s",
+    "schemaVersion": 39,
+    "version": 1
+}

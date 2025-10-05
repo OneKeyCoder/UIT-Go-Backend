@@ -66,6 +66,12 @@ func (s *AuthServer) Authenticate(ctx context.Context, req *pb.AuthRequest) (*pb
 		zap.Int("user_id", user.ID),
 	)
 
+	// Publish authentication event to RabbitMQ
+	if s.Config.RabbitConn != nil {
+		eventData := fmt.Sprintf("User %s (ID: %d) authenticated successfully", user.Email, user.ID)
+		go PublishEvent(s.Config.RabbitConn, "user.login", eventData)
+	}
+
 	return &pb.AuthResponse{
 		Success: true,
 		Message: "Authentication successful",

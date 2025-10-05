@@ -1,0 +1,400 @@
+{
+    "info": {
+        "name": "UIT-Go Microservices - Complete Observability Tests",
+        "description": "Complete test collection for all endpoints including SLO monitoring",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+        {
+            "name": "API Gateway Tests",
+            "item": [
+                {
+                    "name": "Health Check (Broker)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "http://localhost:8080",
+                            "protocol": "http",
+                            "host": [
+                                "localhost"
+                            ],
+                            "port": "8080"
+                        }
+                    }
+                },
+                {
+                    "name": "Handle - Auth Action",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"action\": \"auth\",\n  \"auth\": {\n    \"email\": \"admin@example.com\",\n    \"password\": \"verysecret\"\n  }\n}"
+                        },
+                        "url": {
+                            "raw": "http://localhost:8080/handle",
+                            "protocol": "http",
+                            "host": [
+                                "localhost"
+                            ],
+                            "port": "8080",
+                            "path": [
+                                "handle"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Handle - Log Action",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"action\": \"log\",\n  \"log\": {\n    \"name\": \"test-event\",\n    \"data\": \"Testing observability with distributed tracing\"\n  }\n}"
+                        },
+                        "url": {
+                            "raw": "http://localhost:8080/handle",
+                            "protocol": "http",
+                            "host": [
+                                "localhost"
+                            ],
+                            "port": "8080",
+                            "path": [
+                                "handle"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Direct gRPC Auth",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"verysecret\"\n}"
+                        },
+                        "url": {
+                            "raw": "http://localhost:8080/grpc/auth",
+                            "protocol": "http",
+                            "host": [
+                                "localhost"
+                            ],
+                            "port": "8080",
+                            "path": [
+                                "grpc",
+                                "auth"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Direct gRPC Log",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"name\": \"direct-grpc-test\",\n  \"data\": \"Testing direct gRPC logging endpoint\"\n}"
+                        },
+                        "url": {
+                            "raw": "http://localhost:8080/grpc/log",
+                            "protocol": "http",
+                            "host": [
+                                "localhost"
+                            ],
+                            "port": "8080",
+                            "path": [
+                                "grpc",
+                                "log"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Authentication Service Tests (Direct)",
+            "item": [
+                {
+                    "name": "Register New User",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"email\": \"newuser@example.com\",\n  \"first_name\": \"John\",\n  \"last_name\": \"Doe\",\n  \"password\": \"securepass123\"\n}"
+                        },
+                        "url": {
+                            "raw": "http://localhost:8081/register",
+                            "protocol": "http",
+                            "host": [
+                                "localhost"
+                            ],
+                            "port": "8081",
+                            "path": [
+                                "register"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Authenticate (Direct - For SLO)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"verysecret\"\n}"
+                        },
+                        "url": {
+                            "raw": "http://localhost:8081/authenticate",
+                            "protocol": "http",
+                            "host": [
+                                "localhost"
+                            ],
+                            "port": "8081",
+                            "path": [
+                                "authenticate"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Change Password",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"email\": \"admin@example.com\",\n  \"old_password\": \"verysecret\",\n  \"new_password\": \"newsecurepass456\"\n}"
+                        },
+                        "url": {
+                            "raw": "http://localhost:8081/change-password",
+                            "protocol": "http",
+                            "host": [
+                                "localhost"
+                            ],
+                            "port": "8081",
+                            "path": [
+                                "change-password"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Observability Endpoints",
+            "item": [
+                {
+                    "name": "API Gateway Metrics",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "http://localhost:8080/metrics",
+                            "protocol": "http",
+                            "host": [
+                                "localhost"
+                            ],
+                            "port": "8080",
+                            "path": [
+                                "metrics"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Auth Service Metrics",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "http://localhost:8081/metrics",
+                            "protocol": "http",
+                            "host": [
+                                "localhost"
+                            ],
+                            "port": "8081",
+                            "path": [
+                                "metrics"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Logger Service Metrics",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "http://localhost:50052/metrics",
+                            "protocol": "http",
+                            "host": [
+                                "localhost"
+                            ],
+                            "port": "50052",
+                            "path": [
+                                "metrics"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Load Testing (Generate Metrics)",
+            "item": [
+                {
+                    "name": "Bulk Auth Requests (Success)",
+                    "event": [
+                        {
+                            "listen": "prerequest",
+                            "script": {
+                                "exec": [
+                                    "// This will run multiple times to generate metrics",
+                                    "pm.sendRequest({",
+                                    "    url: 'http://localhost:8081/authenticate',",
+                                    "    method: 'POST',",
+                                    "    header: 'Content-Type:application/json',",
+                                    "    body: {",
+                                    "        mode: 'raw',",
+                                    "        raw: JSON.stringify({",
+                                    "            email: 'admin@example.com',",
+                                    "            password: 'verysecret'",
+                                    "        })",
+                                    "    }",
+                                    "}, function (err, res) {",
+                                    "    console.log('Bulk request sent');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"verysecret\"\n}"
+                        },
+                        "url": {
+                            "raw": "http://localhost:8081/authenticate",
+                            "protocol": "http",
+                            "host": [
+                                "localhost"
+                            ],
+                            "port": "8081",
+                            "path": [
+                                "authenticate"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Bulk Auth Requests (Failure)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"wrongpassword\"\n}"
+                        },
+                        "url": {
+                            "raw": "http://localhost:8081/authenticate",
+                            "protocol": "http",
+                            "host": [
+                                "localhost"
+                            ],
+                            "port": "8081",
+                            "path": [
+                                "authenticate"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Bulk Handle Requests",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"action\": \"auth\",\n  \"auth\": {\n    \"email\": \"admin@example.com\",\n    \"password\": \"verysecret\"\n  }\n}"
+                        },
+                        "url": {
+                            "raw": "http://localhost:8080/handle",
+                            "protocol": "http",
+                            "host": [
+                                "localhost"
+                            ],
+                            "port": "8080",
+                            "path": [
+                                "handle"
+                            ]
+                        }
+                    }
+                }
+            ]
+        }
+    ]
+}

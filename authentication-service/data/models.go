@@ -32,7 +32,6 @@ type Models struct {
 	User User
 }
 
-// User is the structure which holds one user from the database.
 type User struct {
 	ID        int       `json:"id"`
 	Email     string    `json:"email"`
@@ -146,16 +145,14 @@ func (u *User) Update() error {
 	defer cancel()
 
 	stmt := `update users set
-		email = $1,
-		first_name = $2,
-		last_name = $3,
-		user_active = $4,
-		updated_at = $5
-		where id = $6
+		first_name = $1,
+		last_name = $2,
+		user_active = $3,
+		updated_at = $4
+		where id = $5
 	`
 
 	_, err := db.ExecContext(ctx, stmt,
-		u.Email,
 		u.FirstName,
 		u.LastName,
 		u.Active,

@@ -7,6 +7,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 	commonMiddleware "github.com/OneKeyCoder/UIT-Go-Backend/common/middleware"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func (app *Config) routes() http.Handler {
@@ -15,6 +16,7 @@ func (app *Config) routes() http.Handler {
 	// Add common middleware
 	mux.Use(commonMiddleware.Logger)
 	mux.Use(commonMiddleware.Recovery)
+	mux.Use(commonMiddleware.PrometheusMetrics("authentication-service"))
 	
 	// CORS configuration
 	mux.Use(cors.Handler(cors.Options{
@@ -28,10 +30,19 @@ func (app *Config) routes() http.Handler {
 
 	mux.Use(middleware.Heartbeat("/ping"))
 
+	// Health check endpoints for Kubernetes
+	mux.Get("/health/live", app.Liveness)
+	mux.Get("/health/ready", app.Readiness)
+
+	// Metrics endpoint for Prometheus
+	mux.Handle("/metrics", promhttp.Handler())
+
 	// Authentication routes
+	mux.Post("/register", app.Register)
 	mux.Post("/authenticate", app.Authenticate)
 	mux.Post("/refresh", app.RefreshToken)
 	mux.Post("/validate", app.ValidateToken)
+	mux.Patch("/change-password", app.ChangePassword)
 	
 	return mux
 }

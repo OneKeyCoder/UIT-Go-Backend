@@ -29,32 +29,10 @@ services:
       mode: replicated
       replicas: 1
 
-#  mail-service:
-#    image: lyyhua/mail-service:1.0.0
-#    deploy:
-#      mode: replicated
-#      replicas: 1
-#    environment:
-#      MAIL_DOMAIN: localhost
-#      MAIL_HOST: mailhog
-#      MAIL_PORT: 1025
-#      MAIL_ENCRYPTION: none
-#      MAIL_USERNAME: ""
-#      MAIL_PASSWORD: ""
-#      FROM_NAME: "John Smith"
-#      FROM_ADDRESS: john.smith@example.com
-
   rabbitmq:
     image: 'rabbitmq:4.0-alpine'
     deploy:
       mode: global
-
-#  mailhog:
-#    image: 'mailhog/mailhog:latest'
-#    ports:
-#      - "8025:8025"
-#    deploy:
-#      mode: global
 
   mongo:
     image: 'mongo'

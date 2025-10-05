@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"logger-service/data"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"go.mongodb.org/mongo-driver/mongo"
@@ -12,6 +15,7 @@ import (
 
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/logger"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/telemetry"
+	amqp "github.com/rabbitmq/amqp091-go"
 	"go.uber.org/zap"
 )
 
@@ -60,6 +64,26 @@ func main() {
 		Models: data.New(client),
 	}
 
+	// Connect to RabbitMQ
+	rabbitConn, err := connectToRabbitMQ()
+	if err != nil {
+		logger.Error("Failed to connect to RabbitMQ, continuing without consumer", zap.Error(err))
+	} else {
+		logger.Info("Connected to RabbitMQ")
+		// Start RabbitMQ consumer in goroutine
+		go func() {
+			err := app.ConsumeFromRabbitMQ(rabbitConn)
+			if err != nil {
+				logger.Error("RabbitMQ consumer error", zap.Error(err))
+			}
+		}()
+		defer func() {
+			if err := rabbitConn.Close(); err != nil {
+				logger.Error("Error closing RabbitMQ connection", zap.Error(err))
+			}
+		}()
+	}
+
 	go func() {
 		err := app.StartGRPCServer()
 		if err != nil {
@@ -74,10 +98,29 @@ func main() {
 		Handler: app.routes(),
 	}
 
-	err = srv.ListenAndServe()
-	if err != nil {
-		logger.Fatal("Server failed", zap.Error(err))
+	// Start server in goroutine
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			logger.Fatal("Server failed", zap.Error(err))
+		}
+	}()
+
+	// Wait for interrupt signal for graceful shutdown
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+	<-quit
+
+	logger.Info("Shutting down server gracefully...")
+
+	// Graceful shutdown with 30 second timeout
+	ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(ctx); err != nil {
+		logger.Error("Server forced to shutdown", zap.Error(err))
 	}
+
+	logger.Info("Server exited")
 }
 
 func connectToMongo() (*mongo.Client, error) {
@@ -88,6 +131,11 @@ func connectToMongo() (*mongo.Client, error) {
 		Password: "password",
 	})
 
+	// Connection pooling configuration
+	clientOptions.SetMaxPoolSize(50)                        // Maximum connections
+	clientOptions.SetMinPoolSize(10)                        // Minimum idle connections
+	clientOptions.SetMaxConnIdleTime(30 * time.Second)     // Close idle connections after 30s
+
 	c, err := mongo.Connect(context.TODO(), clientOptions)
 	if err != nil {
 		logger.Error("MongoDB connection failed", zap.Error(err))
@@ -96,4 +144,13 @@ func connectToMongo() (*mongo.Client, error) {
 
 	logger.Info("Connected to MongoDB successfully")
 	return c, nil
+}
+
+func connectToRabbitMQ() (*amqp.Connection, error) {
+	rabbitURL := "amqp://guest:guest@rabbitmq"
+	conn, err := amqp.Dial(rabbitURL)
+	if err != nil {
+		return nil, err
+	}
+	return conn, nil
 }

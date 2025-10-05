@@ -1,6 +1,7 @@
 package main
 
 import (
+	"authentication-service/data"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -18,6 +19,19 @@ import (
 type AuthRequest struct {
 	Email    string `json:"email" validate:"required,email"`
 	Password string `json:"password" validate:"required,min=6"`
+}
+
+type RegisterRequest struct {
+	Email     string `json:"email" validate:"required,email"`
+	Password  string `json:"password" validate:"required,min=6"`
+	FirstName string `json:"first_name" validate:"required,min=2"`
+	LastName  string `json:"last_name" validate:"required,min=2"`
+}
+
+type ChangePasswordRequest struct {
+	Email       string `json:"email" validate:"required,email"`
+	OldPassword string `json:"old_password" validate:"required"`
+	NewPassword string `json:"new_password" validate:"required,min=6"`
 }
 
 type AuthResponse struct {
@@ -154,6 +168,114 @@ func (app *Config) ValidateToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response.Success(w, "Token is valid", claims)
+}
+
+// Register handles new user registration
+func (app *Config) Register(w http.ResponseWriter, r *http.Request) {
+	var requestPayload RegisterRequest
+
+	err := request.ReadAndValidate(w, r, &requestPayload)
+	if request.HandleError(w, err) {
+		return
+	}
+
+	// Check if user already exists
+	existingUser, _ := app.Models.User.GetByEmail(requestPayload.Email)
+	if existingUser != nil {
+		response.BadRequest(w, "User with this email already exists")
+		return
+	}
+
+	// Create new user
+	newUser := data.User{
+		Email:     requestPayload.Email,
+		FirstName: requestPayload.FirstName,
+		LastName:  requestPayload.LastName,
+		Password:  requestPayload.Password, // Will be hashed by Insert()
+		Active:    1,
+	}
+
+	userID, err := app.Models.User.Insert(newUser)
+	if err != nil {
+		logger.Error("Failed to create user",
+			zap.String("email", requestPayload.Email),
+			zap.Error(err),
+		)
+		response.InternalServerError(w, "Failed to create user account")
+		return
+	}
+
+	logger.Info("New user registered",
+		zap.String("email", requestPayload.Email),
+		zap.Int("user_id", userID),
+	)
+
+	// Log registration event
+	_ = app.logRequest("registration", fmt.Sprintf("New user registered: %s", requestPayload.Email))
+
+	// Get the newly created user (without password)
+	createdUser, err := app.Models.User.GetOne(userID)
+	if err != nil {
+		// User was created but we couldn't fetch it - still success
+		response.Success(w, "Registration successful", map[string]interface{}{
+			"id":    userID,
+			"email": requestPayload.Email,
+		})
+		return
+	}
+
+	response.Success(w, "Registration successful", createdUser)
+}
+
+// ChangePassword handles password change requests (requires old password verification)
+func (app *Config) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	var requestPayload ChangePasswordRequest
+
+	err := request.ReadAndValidate(w, r, &requestPayload)
+	if request.HandleError(w, err) {
+		return
+	}
+
+	// Get user by email
+	user, err := app.Models.User.GetByEmail(requestPayload.Email)
+	if err != nil {
+		logger.Warn("Password change attempt for non-existent user",
+			zap.String("email", requestPayload.Email),
+		)
+		response.Unauthorized(w, "Invalid credentials")
+		return
+	}
+
+	// Verify old password
+	valid, err := user.PasswordMatches(requestPayload.OldPassword)
+	if err != nil || !valid {
+		logger.Warn("Invalid old password during password change",
+			zap.String("email", requestPayload.Email),
+		)
+		response.Unauthorized(w, "Invalid old password")
+		return
+	}
+
+	// Update to new password
+	err = user.ResetPassword(requestPayload.NewPassword)
+	if err != nil {
+		logger.Error("Failed to change password",
+			zap.String("email", user.Email),
+			zap.Error(err),
+		)
+		response.InternalServerError(w, "Failed to change password")
+		return
+	}
+
+	logger.Info("Password changed successfully",
+		zap.String("email", user.Email),
+		zap.Int("user_id", user.ID),
+	)
+
+	// Log password change event
+	_ = app.logRequest("password_change", fmt.Sprintf("Password changed for user: %s", user.Email))
+
+	response.Success(w, "Password changed successfully", nil)
 }
 
 func (app *Config) logRequest(name, data string) error {

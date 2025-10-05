@@ -2,9 +2,11 @@ package telemetry
 
 import (
 	"context"
+	"os"
 	"time"
 
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -17,19 +19,15 @@ var (
 	Tracer trace.Tracer
 )
 
-// InitTracer initializes OpenTelemetry tracing
+// InitTracer initializes OpenTelemetry tracing with support for OTLP or stdout export
+// Set OTEL_EXPORTER=otlp and OTEL_COLLECTOR_ENDPOINT=host:port to use OTLP collector (Jaeger)
+// Defaults to stdout for development
 func InitTracer(serviceName, serviceVersion string) (func(context.Context) error, error) {
-	// Create stdout exporter for development
-	exporter, err := stdouttrace.New(
-		stdouttrace.WithPrettyPrint(),
-	)
-	if err != nil {
-		return nil, err
-	}
-
+	ctx := context.Background()
+	
 	// Create resource with service information
 	res, err := resource.New(
-		context.Background(),
+		ctx,
 		resource.WithAttributes(
 			semconv.ServiceNameKey.String(serviceName),
 			semconv.ServiceVersionKey.String(serviceVersion),
@@ -39,12 +37,47 @@ func InitTracer(serviceName, serviceVersion string) (func(context.Context) error
 		return nil, err
 	}
 
-	// Create trace provider
-	tp := sdktrace.NewTracerProvider(
-		sdktrace.WithBatcher(exporter),
-		sdktrace.WithResource(res),
-		sdktrace.WithSampler(sdktrace.AlwaysSample()),
-	)
+	// Determine exporter type from environment
+	exporterType := os.Getenv("OTEL_EXPORTER")
+	var tp *sdktrace.TracerProvider
+
+	if exporterType == "otlp" {
+		// Use OTLP exporter for production (Jaeger/OpenTelemetry Collector)
+		endpoint := os.Getenv("OTEL_COLLECTOR_ENDPOINT")
+		if endpoint == "" {
+			endpoint = "jaeger:4317" // Default endpoint for Jaeger in docker-compose
+		}
+
+		// Create OTLP gRPC exporter
+		exporter, err := otlptracegrpc.New(
+			ctx,
+			otlptracegrpc.WithEndpoint(endpoint),
+			otlptracegrpc.WithInsecure(), // Disable TLS for docker-compose
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		tp = sdktrace.NewTracerProvider(
+			sdktrace.WithBatcher(exporter),
+			sdktrace.WithResource(res),
+			sdktrace.WithSampler(sdktrace.AlwaysSample()),
+		)
+	} else {
+		// Use stdout exporter for development
+		exporter, err := stdouttrace.New(
+			stdouttrace.WithPrettyPrint(),
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		tp = sdktrace.NewTracerProvider(
+			sdktrace.WithBatcher(exporter),
+			sdktrace.WithResource(res),
+			sdktrace.WithSampler(sdktrace.AlwaysSample()),
+		)
+	}
 
 	// Set global trace provider
 	otel.SetTracerProvider(tp)

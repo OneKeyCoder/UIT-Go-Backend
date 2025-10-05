@@ -1,7 +1,8 @@
-FROM alpine:latest
+FROM gcr.io/distroless/static
 
-RUN mkdir /app
+COPY authApp /
 
-COPY authApp /app
+EXPOSE 80
+EXPOSE 50051
 
-CMD ["/app/authApp"]
+CMD ["/authApp"]

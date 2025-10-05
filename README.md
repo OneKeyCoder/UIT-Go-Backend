@@ -98,6 +98,10 @@ curl http://localhost:8081/ping
 
 ## 📚 Documentation
 
+-   **[ARCHITECTURE.md](./ARCHITECTURE.md)** - System design, service communication patterns, technology choices, trade-offs
+-   **[MODULE_D_OBSERVABILITY.md](./MODULE_D_OBSERVABILITY.md)** - Complete observability implementation guide (Jaeger, Prometheus, Grafana)
+-   **[DEPLOYMENT.md](./DEPLOYMENT.md)** - Production deployment checklist and configuration changes
+
 | Document                             | Description                  |
 | ------------------------------------ | ---------------------------- |
 | [QUICKSTART.md](./QUICKSTART.md)     | Step-by-step setup guide     |

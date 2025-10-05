@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	_ "github.com/jackc/pgconn"
@@ -15,6 +17,7 @@ import (
 
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/logger"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/telemetry"
+	amqp "github.com/rabbitmq/amqp091-go"
 	"go.uber.org/zap"
 )
 
@@ -28,6 +31,7 @@ type Config struct {
 	JWTSecret     string
 	JWTExpiry     time.Duration
 	RefreshExpiry time.Duration
+	RabbitConn    *amqp.Connection
 }
 
 func main() {
@@ -78,6 +82,19 @@ func main() {
 		}
 	}
 
+	// Connect to RabbitMQ
+	rabbitConn, err := connectToRabbitMQ()
+	if err != nil {
+		logger.Error("Failed to connect to RabbitMQ, continuing without events", zap.Error(err))
+	} else {
+		logger.Info("Connected to RabbitMQ")
+		defer func() {
+			if err := rabbitConn.Close(); err != nil {
+				logger.Error("Error closing RabbitMQ connection", zap.Error(err))
+			}
+		}()
+	}
+
 	// set up config
 	app := Config{
 		DB:            conn,
@@ -85,6 +102,7 @@ func main() {
 		JWTSecret:     jwtSecret,
 		JWTExpiry:     jwtExpiry,
 		RefreshExpiry: refreshExpiry,
+		RabbitConn:    rabbitConn,
 	}
 
 	logger.Info("Starting HTTP server",
@@ -105,10 +123,29 @@ func main() {
 		Handler: app.routes(),
 	}
 
-	err = srv.ListenAndServe()
-	if err != nil {
-		logger.Fatal("Server failed", zap.Error(err))
+	// Start server in goroutine
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			logger.Fatal("Server failed", zap.Error(err))
+		}
+	}()
+
+	// Wait for interrupt signal for graceful shutdown
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+	<-quit
+
+	logger.Info("Shutting down server gracefully...")
+
+	// Graceful shutdown with 30 second timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(ctx); err != nil {
+		logger.Error("Server forced to shutdown", zap.Error(err))
 	}
+
+	logger.Info("Server exited")
 }
 
 func openDB(dsn string) (*sql.DB, error) {
@@ -116,6 +153,11 @@ func openDB(dsn string) (*sql.DB, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// Connection pooling configuration
+	db.SetMaxOpenConns(25)                 // Maximum number of open connections
+	db.SetMaxIdleConns(5)                  // Maximum number of idle connections
+	db.SetConnMaxLifetime(5 * time.Minute) // Maximum lifetime of a connection
 
 	err = db.Ping()
 	if err != nil {
@@ -150,4 +192,13 @@ func connectToDB() *sql.DB {
 		time.Sleep(2 * time.Second)
 		continue
 	}
+}
+
+func connectToRabbitMQ() (*amqp.Connection, error) {
+	rabbitURL := "amqp://guest:guest@rabbitmq"
+	conn, err := amqp.Dial(rabbitURL)
+	if err != nil {
+		return nil, err
+	}
+	return conn, nil
 }
