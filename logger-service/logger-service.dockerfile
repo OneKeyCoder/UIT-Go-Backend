@@ -1,7 +1,8 @@
-FROM alpine:latest
+FROM gcr.io/distroless/static
 
-RUN mkdir /app
+COPY loggerServiceApp /
 
-COPY loggerServiceApp /app
+EXPOSE 80
+EXPOSE 50052
 
-CMD ["/app/loggerServiceApp"]
+CMD ["/loggerServiceApp"]

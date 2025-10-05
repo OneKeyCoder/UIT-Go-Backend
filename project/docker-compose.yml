@@ -1,104 +1,153 @@
-version: '3'
-
 services:
-
-  broker-service:
+  api-gateway:
     build:
-      context: ./../broker-service
-      dockerfile: ./../broker-service/broker-service.dockerfile
-    restart: always
+      context: ./../api-gateway
+      dockerfile: ./../api-gateway/api-gateway.dockerfile
+    restart: unless-stopped
     ports:
       - "8080:80"
-    deploy:
-      mode: replicated
-      replicas: 1
+    depends_on:
+      authentication-service:
+        condition: service_started
+      logger-service:
+        condition: service_started
+      jaeger:
+        condition: service_started
+    environment:
+      OTEL_EXPORTER: "otlp"
+      OTEL_COLLECTOR_ENDPOINT: "jaeger:4317"
 
   logger-service:
     build:
       context: ./../logger-service
       dockerfile: ./../logger-service/logger-service.dockerfile
-    restart: always
-    deploy:
-      mode: replicated
-      replicas: 1
-
-#  mail-service:
-#    build:
-#      context: ./../mail-service
-#      dockerfile: ./../mail-service/mail-service.dockerfile
-#    restart: always
-#    deploy:
-#      mode: replicated
-#      replicas: 1
-#    environment:
-#      MAIL_DOMAIN: localhost
-#      MAIL_HOST: mailhog
-#      MAIL_PORT: 1025
-#      MAIL_ENCRYPTION: none
-#      MAIL_USERNAME: ""
-#      MAIL_PASSWORD: ""
-#      FROM_NAME: "John Smith"
-#      FROM_ADDRESS: john.smith@example.com
+    restart: unless-stopped
+    expose:
+      - "80"
+      - "50052"
+    depends_on:
+      mongo:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+      jaeger:
+        condition: service_started
+    environment:
+      MONGO_URL: "mongodb://admin:password@mongo:27017"
+      OTEL_EXPORTER: "otlp"
+      OTEL_COLLECTOR_ENDPOINT: "jaeger:4317"
 
   authentication-service:
     build:
       context: ./../authentication-service
       dockerfile: ./../authentication-service/authentication-service.dockerfile
-    restart: always
-    ports:
-      - "8081:80"
-    deploy:
-      mode: replicated
-      replicas: 1
+    restart: unless-stopped
+    expose:
+      - "80"
+      - "50051"
+    depends_on:
+      - postgres
+      - rabbitmq
+      - jaeger
     environment:
       DSN: "host=postgres port=5432 user=postgres password=password dbname=users sslmode=disable timezone=UTC connect_timeout=5"
+      JWT_SECRET: "your-secret-key-change-in-production"
+      JWT_EXPIRY: "24h"
+      REFRESH_TOKEN_EXPIRY: "168h"
+      OTEL_EXPORTER: "otlp"
+      OTEL_COLLECTOR_ENDPOINT: "jaeger:4317"
 
   postgres:
-    image: 'postgres'
+    image: "postgres:16-alpine"
     ports:
       - "5432:5432"
-    restart: always
-    deploy:
-      mode: replicated
-      replicas: 1
+    restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
       POSTGRES_DB: users
     volumes:
       - ./db-data/postgres/:/var/lib/postgresql/data/
+      - ./init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
 
   mongo:
-    image: 'mongo'
+    image: "mongo:7-jammy"
     ports:
       - "27017:27017"
+    restart: unless-stopped
     environment:
       MONGO_INITDB_DATABASE: logs
       MONGO_INITDB_ROOT_USERNAME: admin
       MONGO_INITDB_ROOT_PASSWORD: password
     volumes:
       - ./db-data/mongo/:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
-#  mailhog:
-#    image: 'mailhog/mailhog:latest'
-#    ports:
-#      - "1025:1025"
-#      - "8025:8025"
+  redis:
+    image: "redis:7-alpine"
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    command: redis-server --requirepass redispassword
+    volumes:
+      - ./db-data/redis/:/data
 
   rabbitmq:
-    image: 'rabbitmq:4.0-alpine'
+    image: "rabbitmq:3.13-management-alpine"
     ports:
       - "5672:5672"
-    deploy:
-      mode: replicated
-      replicas: 1
+      - "15672:15672"
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
     volumes:
       - ./db-data/rabbitmq/:/var/lib/rabbitmq/
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  listener-service:
-    build:
-      context: ./../listener-service
-      dockerfile: ./../listener-service/listener-service.dockerfile
-    deploy:
-      mode: replicated
-      replicas: 1
+  jaeger:
+    image: "jaegertracing/jaeger:2.2.0"
+    ports:
+      - "16686:16686" # Jaeger UI
+      - "4317:4317" # OTLP gRPC receiver
+      - "4318:4318" # OTLP HTTP receiver
+    restart: unless-stopped
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+
+  prometheus:
+    image: "prom/prometheus:v3.2.0"
+    ports:
+      - "9090:9090"
+    restart: unless-stopped
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus-alerts.yml:/etc/prometheus/prometheus-alerts.yml
+      - ./db-data/prometheus/:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+
+  grafana:
+    image: "grafana/grafana:11.5.0"
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+      - jaeger
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./db-data/grafana/:/var/lib/grafana

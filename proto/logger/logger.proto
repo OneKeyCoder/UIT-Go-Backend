@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package logger;
+
+option go_package = "github.com/OneKeyCoder/UIT-Go-Backend/proto/logger";
+
+// LoggerService provides centralized logging
+service LoggerService {
+  // WriteLog writes a log entry to the database
+  rpc WriteLog(LogRequest) returns (LogResponse);
+
+  // GetLogs retrieves log entries with optional filtering
+  rpc GetLogs(GetLogsRequest) returns (GetLogsResponse);
+}
+
+message LogRequest {
+  string name = 1;
+  string data = 2;
+}
+
+message LogResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message GetLogsRequest {
+  int32 limit = 1;
+  string level = 2; // Optional filter by level
+}
+
+message GetLogsResponse { repeated LogEntry logs = 1; }
+
+message LogEntry {
+  string id = 1;
+  string name = 2;
+  string data = 3;
+  string created_at = 4;
+  string updated_at = 5;
+}
