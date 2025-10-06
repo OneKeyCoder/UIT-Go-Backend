@@ -8,7 +8,6 @@ import (
 	location_service "location-service/internal"
 	"location-service/internal/configs"
 	"location-service/internal/handlers"
-	"location-service/internal/routes"
 
 	"github.com/gin-gonic/gin"
 )
@@ -38,8 +37,26 @@ func main() {
 
 	router := gin.Default()
 
-	routes.InitRoute(router, locationHandlers)
+	InitRoute(router, locationHandlers)
 
 	log.Printf("Starting Location Service on port %s", port)
 	router.Run(":" + port)
+}
+
+func InitRoute(router *gin.Engine, locationHandlers *handlers.Handlers) {
+	router.POST("/", func(c *gin.Context) {
+		locationHandlers.SetCurrentLocation(c.Writer, c.Request)
+	})
+
+	router.GET("/", func(c *gin.Context) {
+		locationHandlers.GetCurrentLocation(c.Writer, c.Request)
+	})
+
+	router.GET("/nearest", func(c *gin.Context) {
+		locationHandlers.FindNearestUsers(c.Writer, c.Request)
+	})
+
+	router.GET("/all", func(c *gin.Context) {
+		locationHandlers.GetAllLocations(c.Writer, c.Request)
+	})
 }

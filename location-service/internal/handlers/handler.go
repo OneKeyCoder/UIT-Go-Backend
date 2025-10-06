@@ -124,3 +124,19 @@ func (h *Handlers) FindNearestUsers(w http.ResponseWriter, r *http.Request) {
 
 	h.writeJSON(w, http.StatusOK, response)
 }
+
+func (h *Handlers) GetAllLocations(w http.ResponseWriter, r *http.Request) {
+	locations, err := h.ser.GetAll()
+	if err != nil {
+		h.errorJSON(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	response := ResponseDTO{
+		StatusCode: http.StatusOK,
+		Message:    "All locations retrieved successfully",
+		Data:       locations,
+	}
+
+	h.writeJSON(w, http.StatusOK, response)
+}

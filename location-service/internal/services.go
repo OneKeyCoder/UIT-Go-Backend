@@ -122,3 +122,21 @@ func (s *LocationService) FindTopNearestUsers(ctx context.Context, userID string
 
 	return locations, nil
 }
+
+func (s *LocationService) GetAll() ([]*CurrentLocation, error) {
+	keys, err := s.redisClient.Keys(context.Background(), "*").Result()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get keys from Redis: %w", err)
+	}
+	locations := make([]*CurrentLocation, 0, len(keys))
+	for _, key := range keys {
+		location, err := s.GetCurrentLocation(context.Background(), key)
+		if err != nil {
+			continue
+		}
+		if location != nil {
+			locations = append(locations, location)
+		}
+	}
+	return locations, nil
+}
