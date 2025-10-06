@@ -4,3 +4,6 @@
 
 # Copilot 
 .github/
+
+# env files
+common/env/
