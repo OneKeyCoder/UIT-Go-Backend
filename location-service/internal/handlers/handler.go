@@ -2,21 +2,19 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"io"
 	"net/http"
 	"strconv"
 
-	service "location-service/internal"
+	location_service "location-service/internal"
 )
 
 type Handlers struct {
 	ctx *context.Context
-	ser *service.LocationService
+	ser *location_service.LocationService
 }
 
-func NewHandlers(ctx *context.Context, ser *service.LocationService) *Handlers {
+func NewHandlers(ctx *context.Context, ser *location_service.LocationService) *Handlers {
 	return &Handlers{
 		ctx: ctx,
 		ser: ser,
@@ -25,7 +23,7 @@ func NewHandlers(ctx *context.Context, ser *service.LocationService) *Handlers {
 
 // SetCurrentLocation handles POST requests to set a user's current location
 func (h *Handlers) SetCurrentLocation(w http.ResponseWriter, r *http.Request) {
-	var location service.CurrentLocation
+	var location location_service.CurrentLocation
 
 	err := h.readJSON(w, r, &location)
 	if err != nil {
@@ -102,7 +100,7 @@ func (h *Handlers) FindNearestUsers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	radiusStr := r.URL.Query().Get("radius")
-	radius := 10.0 // default value in km
+	radius := 5.0 // default value in km
 	if radiusStr != "" {
 		var err error
 		radius, err = strconv.ParseFloat(radiusStr, 64)
@@ -125,62 +123,4 @@ func (h *Handlers) FindNearestUsers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.writeJSON(w, http.StatusOK, response)
-}
-
-// Helper methods
-
-func (h *Handlers) readJSON(w http.ResponseWriter, r *http.Request, data any) error {
-	maxBytes := 1048576 // 1MB
-
-	r.Body = http.MaxBytesReader(w, r.Body, int64(maxBytes))
-
-	dec := json.NewDecoder(r.Body)
-	err := dec.Decode(data)
-	if err != nil {
-		return err
-	}
-
-	err = dec.Decode(&struct{}{})
-	if err != io.EOF {
-		return errors.New("body must have only a single JSON value")
-	}
-
-	return nil
-}
-
-func (h *Handlers) writeJSON(w http.ResponseWriter, status int, data any, headers ...http.Header) error {
-	out, err := json.Marshal(data)
-	if err != nil {
-		return err
-	}
-
-	if len(headers) > 0 {
-		for key, value := range headers[0] {
-			w.Header()[key] = value
-		}
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_, err = w.Write(out)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (h *Handlers) errorJSON(w http.ResponseWriter, err error, status ...int) error {
-	statusCode := http.StatusBadRequest
-
-	if len(status) > 0 {
-		statusCode = status[0]
-	}
-
-	var response ResponseDTO
-	response.StatusCode = statusCode
-	response.Message = err.Error()
-	response.Data = nil
-
-	return h.writeJSON(w, statusCode, response)
 }
