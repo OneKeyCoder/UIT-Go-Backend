@@ -1,18 +1,19 @@
-FROM golang:1.23-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
 
-# Copy go.mod files
-COPY go.mod go.sum ./
+# Copy proto and common modules first (dependencies)
+COPY proto /app/proto
+COPY common /app/common
 
-# Copy common module
-COPY ../common /common
+# Copy location-service
+COPY location-service /app/location-service
+
+# Set working directory to location-service
+WORKDIR /app/location-service
 
 # Download dependencies
 RUN go mod download
-
-# Copy source code
-COPY . .
 
 # Build the application
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o locationServiceApp ./cmd/api
@@ -24,7 +25,7 @@ RUN apk --no-cache add ca-certificates
 
 WORKDIR /app
 
-COPY --from=builder /app/locationServiceApp .
+COPY --from=builder /app/location-service/locationServiceApp .
 
 EXPOSE 80
 

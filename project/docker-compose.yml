@@ -61,8 +61,8 @@ services:
 
   location-service:
     build:
-      context: ./../location-service
-      dockerfile: ./../location-service/location-service.dockerfile
+      context: ./..
+      dockerfile: ./location-service/location-service.dockerfile
     restart: unless-stopped
     expose:
       - "80"
