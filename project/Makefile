@@ -2,6 +2,7 @@ SHELL=cmd.exe
 GATEWAY_BINARY=gatewayApp
 AUTH_BINARY=authApp
 LOGGER_BINARY=loggerServiceApp
+LOCATION_BINARY=locationServiceApp
 
 ## help: Display this help message
 help:
@@ -23,7 +24,7 @@ up:
 	@echo Docker images started!
 
 ## up_build: stops docker-compose (if running), builds all projects and starts docker compose
-up_build: build_gateway build_auth build_logger down
+up_build: build_gateway build_auth build_logger build_location down
 	@echo "Building and starting docker images..."
 	docker-compose up --build -d
 
@@ -51,6 +52,7 @@ tidy:
 	chdir ..\api-gateway && go mod tidy
 	chdir ..\authentication-service && go mod tidy
 	chdir ..\logger-service && go mod tidy
+	chdir ..\location-service && go mod tidy
 	@echo All services tidied!
 
 ## test: run tests for all services
@@ -59,6 +61,7 @@ test:
 	chdir ..\api-gateway && go test -v ./...
 	chdir ..\authentication-service && go test -v ./...
 	chdir ..\logger-service && go test -v ./...
+	chdir ..\location-service && go test -v ./...
 	@echo Tests complete!
 
 ## init_db: initialize database with tables and test data
@@ -83,4 +86,10 @@ build_logger:
 build_auth:
 	@echo Building auth binary...
 	chdir ..\authentication-service && set GOOS=linux&& set GOARCH=amd64&& set CGO_ENABLED=0 && go build -o ${AUTH_BINARY} ./cmd/api
+	@echo Done!
+
+## build_location: builds the location binary as a linux executable
+build_location:
+	@echo Building location binary...
+	chdir ..\location-service && set GOOS=linux&& set GOARCH=amd64&& set CGO_ENABLED=0 && go build -o ${LOCATION_BINARY} ./cmd/api
 	@echo Done!
