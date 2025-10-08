@@ -6,21 +6,26 @@ rule_files:
   - "prometheus-alerts.yml"
 
 scrape_configs:
-  - job_name: 'api-gateway'
+  - job_name: "api-gateway"
     static_configs:
-      - targets: ['api-gateway:80']
-    metrics_path: '/metrics'
+      - targets: ["api-gateway:80"]
+    metrics_path: "/metrics"
 
-  - job_name: 'authentication-service'
+  - job_name: "authentication-service"
     static_configs:
-      - targets: ['authentication-service:80']
-    metrics_path: '/metrics'
+      - targets: ["authentication-service:80"]
+    metrics_path: "/metrics"
 
-  - job_name: 'logger-service'
+  - job_name: "logger-service"
     static_configs:
-      - targets: ['logger-service:80']
-    metrics_path: '/metrics'
+      - targets: ["logger-service:80"]
+    metrics_path: "/metrics"
 
-  - job_name: 'prometheus'
+  - job_name: "location-service"
     static_configs:
-      - targets: ['localhost:9090']
+      - targets: ["location-service:80"]
+    metrics_path: "/metrics"
+
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]

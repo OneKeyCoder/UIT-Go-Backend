@@ -1,16 +1,18 @@
 package main
 
 import (
+	"net/http"
+
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/request"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/response"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/telemetry"
-	"net/http"
 )
 
 type RequestPayload struct {
-	Action string       `json:"action" validate:"required"`
-	Auth   *AuthPayload `json:"auth,omitempty"`
-	Log    *LogPayload  `json:"log,omitempty"`
+	Action   string           `json:"action" validate:"required"`
+	Auth     *AuthPayload     `json:"auth,omitempty"`
+	Log      *LogPayload      `json:"log,omitempty"`
+	Location *LocationPayload `json:"location,omitempty"`
 }
 
 type AuthPayload struct {
@@ -21,6 +23,18 @@ type AuthPayload struct {
 type LogPayload struct {
 	Name string `json:"name" validate:"required"`
 	Data string `json:"data" validate:"required"`
+}
+
+type LocationPayload struct {
+	Action    string  `json:"action" validate:"required"` // set, get, nearest, all
+	UserID    string  `json:"user_id" validate:"required"`
+	Latitude  float64 `json:"latitude,omitempty"`
+	Longitude float64 `json:"longitude,omitempty"`
+	Speed     float64 `json:"speed,omitempty"`
+	Heading   string  `json:"heading,omitempty"`
+	Timestamp string  `json:"timestamp,omitempty"`
+	TopN      int32   `json:"top_n,omitempty"`
+	Radius    float64 `json:"radius,omitempty"`
 }
 
 func (app *Config) Broker(w http.ResponseWriter, r *http.Request) {
@@ -61,6 +75,17 @@ func (app *Config) HandleSubmission(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		app.logItemViaGRPCClient(w, r.WithContext(ctx), *requestPayload.Log)
+	case "location":
+		if requestPayload.Location == nil {
+			response.BadRequest(w, "location payload is required for location action")
+			return
+		}
+		// Validate the location payload
+		if err := request.Validate(requestPayload.Location); err != nil {
+			request.HandleError(w, err)
+			return
+		}
+		app.handleLocationRequest(w, r.WithContext(ctx), *requestPayload.Location)
 	default:
 		response.BadRequest(w, "Unknown action")
 	}
@@ -115,3 +140,169 @@ func (app *Config) logItemViaGRPCClient(w http.ResponseWriter, r *http.Request, 
 	response.Success(w, "Logged via gRPC", nil)
 }
 
+// handleLocationRequest routes location-related requests to appropriate handlers
+func (app *Config) handleLocationRequest(w http.ResponseWriter, r *http.Request, loc LocationPayload) {
+	ctx, span := telemetry.StartSpan(r.Context(), "handleLocationRequest")
+	defer span.End()
+
+	switch loc.Action {
+	case "set":
+		app.setLocationViaGRPC(w, r.WithContext(ctx), loc)
+	case "get":
+		app.getLocationViaGRPC(w, r.WithContext(ctx), loc)
+	case "nearest":
+		app.findNearestUsersViaGRPC(w, r.WithContext(ctx), loc)
+	case "all":
+		app.getAllLocationsViaGRPC(w, r.WithContext(ctx))
+	default:
+		response.BadRequest(w, "Unknown location action. Use: set, get, nearest, or all")
+	}
+}
+
+// setLocationViaGRPC sets a user's location using gRPC
+func (app *Config) setLocationViaGRPC(w http.ResponseWriter, r *http.Request, loc LocationPayload) {
+	ctx, span := telemetry.StartSpan(r.Context(), "setLocationViaGRPC")
+	defer span.End()
+
+	resp, err := app.SetLocationViaGRPC(ctx, loc.UserID, loc.Latitude, loc.Longitude, loc.Speed, loc.Heading, loc.Timestamp)
+	if err != nil {
+		response.InternalServerError(w, "Failed to set location")
+		return
+	}
+
+	if !resp.Success {
+		response.BadRequest(w, resp.Message)
+		return
+	}
+
+	payload := map[string]interface{}{
+		"message": resp.Message,
+		"location": map[string]interface{}{
+			"user_id":   resp.Location.UserId,
+			"latitude":  resp.Location.Latitude,
+			"longitude": resp.Location.Longitude,
+			"speed":     resp.Location.Speed,
+			"heading":   resp.Location.Heading,
+			"timestamp": resp.Location.Timestamp,
+		},
+	}
+
+	response.Success(w, "Location set successfully", payload)
+}
+
+// getLocationViaGRPC gets a user's location using gRPC
+func (app *Config) getLocationViaGRPC(w http.ResponseWriter, r *http.Request, loc LocationPayload) {
+	ctx, span := telemetry.StartSpan(r.Context(), "getLocationViaGRPC")
+	defer span.End()
+
+	resp, err := app.GetLocationViaGRPC(ctx, loc.UserID)
+	if err != nil {
+		response.InternalServerError(w, "Failed to get location")
+		return
+	}
+
+	if !resp.Success {
+		response.NotFound(w, resp.Message)
+		return
+	}
+
+	payload := map[string]interface{}{
+		"message": resp.Message,
+		"location": map[string]interface{}{
+			"user_id":   resp.Location.UserId,
+			"latitude":  resp.Location.Latitude,
+			"longitude": resp.Location.Longitude,
+			"speed":     resp.Location.Speed,
+			"heading":   resp.Location.Heading,
+			"timestamp": resp.Location.Timestamp,
+			"distance":  resp.Location.Distance,
+		},
+	}
+
+	response.Success(w, "Location retrieved successfully", payload)
+}
+
+// findNearestUsersViaGRPC finds nearest users using gRPC
+func (app *Config) findNearestUsersViaGRPC(w http.ResponseWriter, r *http.Request, loc LocationPayload) {
+	ctx, span := telemetry.StartSpan(r.Context(), "findNearestUsersViaGRPC")
+	defer span.End()
+
+	topN := loc.TopN
+	if topN <= 0 {
+		topN = 10
+	}
+
+	radius := loc.Radius
+	if radius <= 0 {
+		radius = 10.0
+	}
+
+	resp, err := app.FindNearestUsersViaGRPC(ctx, loc.UserID, topN, radius)
+	if err != nil {
+		response.InternalServerError(w, "Failed to find nearest users")
+		return
+	}
+
+	if !resp.Success {
+		response.BadRequest(w, resp.Message)
+		return
+	}
+
+	locations := make([]map[string]interface{}, 0, len(resp.Locations))
+	for _, l := range resp.Locations {
+		locations = append(locations, map[string]interface{}{
+			"user_id":   l.UserId,
+			"latitude":  l.Latitude,
+			"longitude": l.Longitude,
+			"speed":     l.Speed,
+			"heading":   l.Heading,
+			"timestamp": l.Timestamp,
+			"distance":  l.Distance,
+		})
+	}
+
+	payload := map[string]interface{}{
+		"message":   resp.Message,
+		"locations": locations,
+		"count":     len(locations),
+	}
+
+	response.Success(w, "Nearest users found successfully", payload)
+}
+
+// getAllLocationsViaGRPC gets all locations using gRPC
+func (app *Config) getAllLocationsViaGRPC(w http.ResponseWriter, r *http.Request) {
+	ctx, span := telemetry.StartSpan(r.Context(), "getAllLocationsViaGRPC")
+	defer span.End()
+
+	resp, err := app.GetAllLocationsViaGRPC(ctx)
+	if err != nil {
+		response.InternalServerError(w, "Failed to get all locations")
+		return
+	}
+
+	if !resp.Success {
+		response.BadRequest(w, resp.Message)
+		return
+	}
+
+	locations := make([]map[string]interface{}, 0, len(resp.Locations))
+	for _, l := range resp.Locations {
+		locations = append(locations, map[string]interface{}{
+			"user_id":   l.UserId,
+			"latitude":  l.Latitude,
+			"longitude": l.Longitude,
+			"speed":     l.Speed,
+			"heading":   l.Heading,
+			"timestamp": l.Timestamp,
+		})
+	}
+
+	payload := map[string]interface{}{
+		"message":     resp.Message,
+		"locations":   locations,
+		"total_count": resp.TotalCount,
+	}
+
+	response.Success(w, "All locations retrieved successfully", payload)
+}

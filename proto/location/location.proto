@@ -1,0 +1,85 @@
+syntax = "proto3";
+
+package location;
+
+option go_package = "github.com/OneKeyCoder/UIT-Go-Backend/proto/location";
+
+// LocationService provides location-based operations
+service LocationService {
+  // SetLocation sets the current location for a user
+  rpc SetLocation(SetLocationRequest) returns (SetLocationResponse);
+  
+  // GetLocation retrieves the current location for a user
+  rpc GetLocation(GetLocationRequest) returns (GetLocationResponse);
+  
+  // FindNearestUsers finds the nearest users to a given user
+  rpc FindNearestUsers(FindNearestUsersRequest) returns (FindNearestUsersResponse);
+  
+  // GetAllLocations retrieves all stored locations
+  rpc GetAllLocations(GetAllLocationsRequest) returns (GetAllLocationsResponse);
+}
+
+// Location represents a user's geographical location
+message Location {
+  string user_id = 1;
+  double latitude = 2;
+  double longitude = 3;
+  double distance = 4;    // Distance from reference point (in km)
+  double speed = 5;       // Speed in km/h
+  string heading = 6;     // Direction (N, NE, E, SE, S, SW, W, NW)
+  string timestamp = 7;   // ISO 8601 timestamp
+}
+
+// SetLocationRequest contains the location data to set
+message SetLocationRequest {
+  string user_id = 1;
+  double latitude = 2;
+  double longitude = 3;
+  double speed = 4;
+  string heading = 5;
+  string timestamp = 6;
+}
+
+// SetLocationResponse indicates success or failure
+message SetLocationResponse {
+  bool success = 1;
+  string message = 2;
+  Location location = 3;
+}
+
+// GetLocationRequest specifies which user's location to retrieve
+message GetLocationRequest {
+  string user_id = 1;
+}
+
+// GetLocationResponse contains the user's location
+message GetLocationResponse {
+  bool success = 1;
+  string message = 2;
+  Location location = 3;
+}
+
+// FindNearestUsersRequest specifies search parameters
+message FindNearestUsersRequest {
+  string user_id = 1;
+  int32 top_n = 2;        // Number of nearest users to return
+  double radius = 3;      // Search radius in km (default: 10)
+}
+
+// FindNearestUsersResponse contains the list of nearest users
+message FindNearestUsersResponse {
+  bool success = 1;
+  string message = 2;
+  repeated Location locations = 3;
+}
+
+// GetAllLocationsRequest is empty (retrieves all)
+message GetAllLocationsRequest {}
+
+// GetAllLocationsResponse contains all locations
+message GetAllLocationsResponse {
+  bool success = 1;
+  string message = 2;
+  repeated Location locations = 3;
+  int32 total_count = 4;
+}
