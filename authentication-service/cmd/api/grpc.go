@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"net"
 
-	pb "github.com/OneKeyCoder/UIT-Go-Backend/proto/auth"
+	"github.com/OneKeyCoder/UIT-Go-Backend/common/grpcutil"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/jwt"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/logger"
-	"github.com/OneKeyCoder/UIT-Go-Backend/common/grpcutil"
+	pb "github.com/OneKeyCoder/UIT-Go-Backend/proto/auth"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -100,7 +100,7 @@ func (s *AuthServer) ValidateToken(ctx context.Context, req *pb.ValidateTokenReq
 
 	return &pb.ValidateTokenResponse{
 		Valid:  true,
-		UserId: fmt.Sprintf("%d", claims.UserID),
+		UserId: int32(claims.UserID),
 		Email:  claims.Email,
 		Role:   claims.Role,
 	}, nil

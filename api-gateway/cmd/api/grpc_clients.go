@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"strconv"
 	"time"
 
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/grpcutil"
@@ -91,6 +92,25 @@ func (app *Config) AuthenticateViaGRPC(ctx context.Context, email, password stri
 
 	return resp, nil
 }
+func (app *Config) ValidateTokenViaGRPC(ctx context.Context, token string) (*authpb.ValidateTokenResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	req := &authpb.ValidateTokenRequest{
+		Token: token,
+	}
+	logger.Info("Calling authentication service ValidateToken via gRPC",
+		zap.String("token", token),
+	)
+
+	resp, err := app.GRPCClients.AuthClient.ValidateToken(ctx, req)
+	if err != nil {
+		logger.Error("gRPC ValidateToken failed", zap.Error(err))
+		return nil, err
+	}
+
+	return resp, nil
+}
 
 // LogViaGRPC logs via gRPC to logger service
 func (app *Config) LogViaGRPC(ctx context.Context, name, data string) error {
@@ -116,12 +136,12 @@ func (app *Config) LogViaGRPC(ctx context.Context, name, data string) error {
 }
 
 // SetLocationViaGRPC sets a user's location via gRPC
-func (app *Config) SetLocationViaGRPC(ctx context.Context, userID string, lat, lon, speed float64, heading, timestamp string) (*locationpb.SetLocationResponse, error) {
+func (app *Config) SetLocationViaGRPC(ctx context.Context, userID int, lat, lon, speed float64, heading, timestamp string) (*locationpb.SetLocationResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	req := &locationpb.SetLocationRequest{
-		UserId:    userID,
+		UserId:    int32(userID),
 		Latitude:  lat,
 		Longitude: lon,
 		Speed:     speed,
@@ -130,7 +150,7 @@ func (app *Config) SetLocationViaGRPC(ctx context.Context, userID string, lat, l
 	}
 
 	logger.Info("Calling location service SetLocation via gRPC",
-		zap.String("user_id", userID),
+		zap.String("user_id", strconv.Itoa(userID)),
 	)
 
 	resp, err := app.GRPCClients.LocationClient.SetLocation(ctx, req)
@@ -143,16 +163,16 @@ func (app *Config) SetLocationViaGRPC(ctx context.Context, userID string, lat, l
 }
 
 // GetLocationViaGRPC gets a user's location via gRPC
-func (app *Config) GetLocationViaGRPC(ctx context.Context, userID string) (*locationpb.GetLocationResponse, error) {
+func (app *Config) GetLocationViaGRPC(ctx context.Context, userID int) (*locationpb.GetLocationResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	req := &locationpb.GetLocationRequest{
-		UserId: userID,
+		UserId: int32(userID),
 	}
 
 	logger.Info("Calling location service GetLocation via gRPC",
-		zap.String("user_id", userID),
+		zap.String("user_id", strconv.Itoa(userID)),
 	)
 
 	resp, err := app.GRPCClients.LocationClient.GetLocation(ctx, req)
@@ -165,18 +185,18 @@ func (app *Config) GetLocationViaGRPC(ctx context.Context, userID string) (*loca
 }
 
 // FindNearestUsersViaGRPC finds nearest users via gRPC
-func (app *Config) FindNearestUsersViaGRPC(ctx context.Context, userID string, topN int32, radius float64) (*locationpb.FindNearestUsersResponse, error) {
+func (app *Config) FindNearestUsersViaGRPC(ctx context.Context, userID int, topN int32, radius float64) (*locationpb.FindNearestUsersResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	req := &locationpb.FindNearestUsersRequest{
-		UserId: userID,
+		UserId: int32(userID),
 		TopN:   topN,
 		Radius: radius,
 	}
 
 	logger.Info("Calling location service FindNearestUsers via gRPC",
-		zap.String("user_id", userID),
+		zap.String("user_id", strconv.Itoa(userID)),
 		zap.Int32("top_n", topN),
 		zap.Float64("radius", radius),
 	)

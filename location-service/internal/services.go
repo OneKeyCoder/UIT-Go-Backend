@@ -41,12 +41,12 @@ func (s *LocationService) SetCurrentLocation(ctx context.Context, location *Curr
 		ttl = 3600
 	}
 
-	if err := s.redisClient.Set(ctx, location.UserID, data, time.Duration(ttl)*time.Second).Err(); err != nil {
+	if err := s.redisClient.Set(ctx, strconv.Itoa(location.UserID), data, time.Duration(ttl)*time.Second).Err(); err != nil {
 		return fmt.Errorf("failed to set location in Redis: %w", err)
 	}
 
 	if err := s.redisClient.GeoAdd(ctx, "geo:users", &redis.GeoLocation{
-		Name:      location.UserID,
+		Name:      strconv.Itoa(location.UserID),
 		Longitude: location.Longitude,
 		Latitude:  location.Latitude,
 	}).Err(); err != nil {
@@ -56,8 +56,8 @@ func (s *LocationService) SetCurrentLocation(ctx context.Context, location *Curr
 	return nil
 }
 
-func (s *LocationService) GetCurrentLocation(ctx context.Context, userID string) (*CurrentLocation, error) {
-	data, err := s.redisClient.Get(ctx, userID).Result()
+func (s *LocationService) GetCurrentLocation(ctx context.Context, userID int) (*CurrentLocation, error) {
+	data, err := s.redisClient.Get(ctx, strconv.Itoa(userID)).Result()
 	if err != nil {
 		if err == redis.Nil {
 			return nil, nil // No location found
@@ -71,9 +71,9 @@ func (s *LocationService) GetCurrentLocation(ctx context.Context, userID string)
 	return &location, nil
 }
 
-func (s *LocationService) FindTopNearestUsers(ctx context.Context, userID string, topN int, radius float64) ([]*CurrentLocation, error) {
+func (s *LocationService) FindTopNearestUsers(ctx context.Context, userID int, topN int, radius float64) ([]*CurrentLocation, error) {
 	// Get the current user's position
-	userPos, err := s.redisClient.GeoPos(ctx, "geo:users", userID).Result()
+	userPos, err := s.redisClient.GeoPos(ctx, "geo:users", strconv.Itoa(userID)).Result()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user position: %w", err)
 	}
@@ -103,12 +103,15 @@ func (s *LocationService) FindTopNearestUsers(ctx context.Context, userID string
 	locations := make([]*CurrentLocation, 0, topN)
 	for _, geoLoc := range results {
 		// Skip the user themselves
-		if geoLoc.Name == userID {
+		if geoLoc.Name == strconv.Itoa(userID) {
 			continue
 		}
-
+		tempGeoLoc, err := strconv.Atoi(geoLoc.Name)
+		if err != nil {
+			continue
+		}
 		// Get full location details from Redis
-		location, err := s.GetCurrentLocation(ctx, geoLoc.Name)
+		location, err := s.GetCurrentLocation(ctx, tempGeoLoc)
 		if err != nil {
 			// Skip if we can't get the location details
 			continue
@@ -143,8 +146,11 @@ func (s *LocationService) GetAllLocations(ctx context.Context) ([]*CurrentLocati
 		if key == "geo:users" {
 			continue
 		}
-
-		location, err := s.GetCurrentLocation(ctx, key)
+		tempGeo, err := strconv.Atoi(key)
+		if err != nil {
+			continue
+		}
+		location, err := s.GetCurrentLocation(ctx, tempGeo)
 		if err != nil {
 			continue
 		}

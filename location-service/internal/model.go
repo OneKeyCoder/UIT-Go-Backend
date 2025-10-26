@@ -1,7 +1,7 @@
 package location_service
 
 type CurrentLocation struct {
-	UserID    string  `json:"user_id"`
+	UserID    int     `json:"user_id"`
 	Latitude  float64 `json:"latitude"`
 	Longitude float64 `json:"longitude"`
 	Distance  float64 `json:"distance,omitempty"`
