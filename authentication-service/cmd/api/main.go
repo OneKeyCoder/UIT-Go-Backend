@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"math"
 	"net/http"
 	"os"
 	"os/signal"
@@ -195,10 +196,29 @@ func connectToDB() *sql.DB {
 }
 
 func connectToRabbitMQ() (*amqp.Connection, error) {
-	rabbitURL := "amqp://guest:guest@rabbitmq"
-	conn, err := amqp.Dial(rabbitURL)
-	if err != nil {
-		return nil, err
+	var counts int64
+	var backOff = 1 * time.Second
+	var connection *amqp.Connection
+
+	for {
+		c, err := amqp.Dial("amqp://guest:guest@rabbitmq")
+		if err != nil {
+			logger.Info("RabbitMQ not yet ready...")
+			counts++
+		} else {
+			logger.Info("Connected to rabbitmq")
+			connection = c
+			break
+		}
+
+		if counts > 5 {
+			fmt.Println(err)
+			return nil, err
+		}
+		backOff = time.Duration(math.Pow(float64(counts), 2)) * time.Second
+		logger.Info("backing off...")
+		time.Sleep(backOff)
+		continue
 	}
-	return conn, nil
+	return connection, nil
 }
