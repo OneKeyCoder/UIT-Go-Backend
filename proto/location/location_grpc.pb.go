@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             v5.29.3
-// source: location.proto
+// source: location/location.proto
 
 package location
 
@@ -243,5 +243,5 @@ var LocationService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "location.proto",
+	Metadata: "location/location.proto",
 }

@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS users (
     last_name VARCHAR(255),
     password VARCHAR(255) NOT NULL,
     user_active INT DEFAULT 1,
+    role VARCHAR(50) DEFAULT 'user',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -38,13 +39,14 @@ CREATE TRIGGER update_users_updated_at
 -- You should generate your own hash using: https://bcrypt-generator.com/
 
 -- Test User 1
-INSERT INTO users (email, first_name, last_name, password, user_active)
+INSERT INTO users (email, first_name, last_name, password, user_active, role)
 VALUES (
     'admin@example.com',
     'Admin',
     'User',
     '$2a$12$jTyjFOoRBzkkndUdrx678uUEPXrtPw235PlWZ2l8jwdaI4PWBFUwS',  -- Replace with actual bcrypt hash
-    1
+    1,
+    'admin'
 ) ON CONFLICT (email) DO NOTHING;
 
 -- Test User 2
@@ -58,13 +60,14 @@ VALUES (
 ) ON CONFLICT (email) DO NOTHING;
 
 -- Test User 3
-INSERT INTO users (email, first_name, last_name, password, user_active)
+INSERT INTO users (email, first_name, last_name, password, user_active, role)
 VALUES (
     'jane.smith@example.com',
     'Jane',
     'Smith',
     '$2a$12$jTyjFOoRBzkkndUdrx678uUEPXrtPw235PlWZ2l8jwdaI4PWBFUwS',  -- Replace with actual bcrypt hash
-    1
+    1,
+    'driver'
 ) ON CONFLICT (email) DO NOTHING;
 
 -- Verify users

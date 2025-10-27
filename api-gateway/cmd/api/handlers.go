@@ -96,7 +96,7 @@ func (app *Config) setLocationViaGRPC(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	userID := int(claims.UserID)
-	resp, err := app.SetLocationViaGRPC(ctx, userID, loc.Latitude, loc.Longitude, loc.Speed, loc.Heading, loc.Timestamp)
+	resp, err := app.SetLocationViaGRPC(ctx, userID, claims.Role, loc.Latitude, loc.Longitude, loc.Speed, loc.Heading, loc.Timestamp)
 	if err != nil {
 		response.InternalServerError(w, "Failed to set location")
 		return

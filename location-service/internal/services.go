@@ -116,7 +116,9 @@ func (s *LocationService) FindTopNearestUsers(ctx context.Context, userID int, t
 			// Skip if we can't get the location details
 			continue
 		}
-
+		if location.Role != "driver" {
+			continue
+		}
 		if location != nil {
 			// Add distance to the location
 			location.Distance = geoLoc.Dist

@@ -28,6 +28,7 @@ func (s *LocationServer) SetLocation(ctx context.Context, req *pb.SetLocationReq
 
 	location := &location_service.CurrentLocation{
 		UserID:    int(req.UserId),
+		Role:      req.Role,
 		Latitude:  req.Latitude,
 		Longitude: req.Longitude,
 		Speed:     req.Speed,
@@ -49,6 +50,7 @@ func (s *LocationServer) SetLocation(ctx context.Context, req *pb.SetLocationReq
 		Message: "Location updated successfully",
 		Location: &pb.Location{
 			UserId:    int32(location.UserID),
+			Role:      location.Role,
 			Latitude:  location.Latitude,
 			Longitude: location.Longitude,
 			Speed:     location.Speed,
@@ -82,6 +84,7 @@ func (s *LocationServer) GetLocation(ctx context.Context, req *pb.GetLocationReq
 		Message: "Location retrieved successfully",
 		Location: &pb.Location{
 			UserId:    int32(location.UserID),
+			Role:      location.Role,
 			Latitude:  location.Latitude,
 			Longitude: location.Longitude,
 			Speed:     location.Speed,
@@ -121,6 +124,7 @@ func (s *LocationServer) FindNearestUsers(ctx context.Context, req *pb.FindNeare
 	for _, loc := range locations {
 		pbLocations = append(pbLocations, &pb.Location{
 			UserId:    int32(loc.UserID),
+			Role:      loc.Role,
 			Latitude:  loc.Latitude,
 			Longitude: loc.Longitude,
 			Speed:     loc.Speed,

@@ -51,7 +51,7 @@ func (s *AuthServer) Authenticate(ctx context.Context, req *pb.AuthRequest) (*pb
 	tokens, err := jwt.GenerateTokenPair(
 		user.ID,
 		user.Email,
-		"", // role - add if you have roles
+		user.Role,
 		s.Config.JWTSecret,
 		s.Config.JWTExpiry,
 		s.Config.RefreshExpiry,

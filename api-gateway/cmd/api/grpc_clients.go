@@ -136,12 +136,13 @@ func (app *Config) LogViaGRPC(ctx context.Context, name, data string) error {
 }
 
 // SetLocationViaGRPC sets a user's location via gRPC
-func (app *Config) SetLocationViaGRPC(ctx context.Context, userID int, lat, lon, speed float64, heading, timestamp string) (*locationpb.SetLocationResponse, error) {
+func (app *Config) SetLocationViaGRPC(ctx context.Context, userID int, role string, lat, lon, speed float64, heading, timestamp string) (*locationpb.SetLocationResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	req := &locationpb.SetLocationRequest{
 		UserId:    int32(userID),
+		Role:      role,
 		Latitude:  lat,
 		Longitude: lon,
 		Speed:     speed,

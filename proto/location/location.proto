@@ -22,22 +22,24 @@ service LocationService {
 // Location represents a user's geographical location
 message Location {
   int32 user_id = 1;
-  double latitude = 2;
-  double longitude = 3;
-  double distance = 4;    // Distance from reference point (in km)
-  double speed = 5;       // Speed in km/h
-  string heading = 6;     // Direction (N, NE, E, SE, S, SW, W, NW)
-  string timestamp = 7;   // ISO 8601 timestamp
+  string role = 2;   
+  double latitude = 3;
+  double longitude = 4;
+  double distance = 5;    // Distance from reference point (in km)
+  double speed = 6;       // Speed in km/h
+  string heading = 7;     // Direction (N, NE, E, SE, S, SW, W, NW)
+  string timestamp = 8;   // ISO 8601 timestamp
 }
 
 // SetLocationRequest contains the location data to set
 message SetLocationRequest {
   int32 user_id = 1;
-  double latitude = 2;
-  double longitude = 3;
-  double speed = 4;
-  string heading = 5;
-  string timestamp = 6;
+  string role = 2;
+  double latitude = 3;
+  double longitude = 4;
+  double speed = 5;
+  string heading = 6;
+  string timestamp = 7;
 }
 
 // SetLocationResponse indicates success or failure
@@ -62,8 +64,9 @@ message GetLocationResponse {
 // FindNearestUsersRequest specifies search parameters
 message FindNearestUsersRequest {
   int32 user_id = 1;
-  int32 top_n = 2;        // Number of nearest users to return
-  double radius = 3;      // Search radius in km (default: 10)
+  string role = 2;
+  int32 top_n = 3;        // Number of nearest users to return
+  double radius = 4;      // Search radius in km (default: 10)
 }
 
 // FindNearestUsersResponse contains the list of nearest users
