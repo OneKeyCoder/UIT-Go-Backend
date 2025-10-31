@@ -26,6 +26,11 @@ scrape_configs:
       - targets: ["location-service:80"]
     metrics_path: "/metrics"
 
+  - job_name: "trip-service"
+    static_configs:
+      - targets: ["trip-service:80"]
+    metrics_path: "/metrics"
+
   - job_name: "prometheus"
     static_configs:
       - targets: ["localhost:9090"]

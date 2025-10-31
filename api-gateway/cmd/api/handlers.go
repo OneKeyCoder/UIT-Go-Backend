@@ -2,18 +2,15 @@ package main
 
 import (
 	"net/http"
+	"strconv"
 
+	"github.com/OneKeyCoder/UIT-Go-Backend/common/logger"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/request"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/response"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/telemetry"
+	"github.com/go-chi/chi/v5"
+	"go.uber.org/zap"
 )
-
-type RequestPayload struct {
-	Action   string           `json:"action" validate:"required"`
-	Auth     *AuthPayload     `json:"auth,omitempty"`
-	Log      *LogPayload      `json:"log,omitempty"`
-	Location *LocationPayload `json:"location,omitempty"`
-}
 
 type AuthPayload struct {
 	Email    string `json:"email" validate:"required,email"`
@@ -26,8 +23,6 @@ type LogPayload struct {
 }
 
 type LocationPayload struct {
-	Action    string  `json:"action" validate:"required"` // set, get, nearest, all
-	UserID    string  `json:"user_id" validate:"required"`
 	Latitude  float64 `json:"latitude,omitempty"`
 	Longitude float64 `json:"longitude,omitempty"`
 	Speed     float64 `json:"speed,omitempty"`
@@ -37,58 +32,25 @@ type LocationPayload struct {
 	Radius    float64 `json:"radius,omitempty"`
 }
 
-func (app *Config) Broker(w http.ResponseWriter, r *http.Request) {
-	response.Success(w, "Hit the broker", nil)
+type CreateTripRequest struct {
+	OriginLat     float64 `json:"origin_lat" validate:"required"`
+	OriginLng     float64 `json:"origin_lng" validate:"required"`
+	DestLat       float64 `json:"dest_lat" validate:"required"`
+	DestLng       float64 `json:"dest_lng" validate:"required"`
+	PaymentMethod string  `json:"payment_method" validate:"required,oneof=cash card"`
 }
 
-func (app *Config) HandleSubmission(w http.ResponseWriter, r *http.Request) {
-	ctx, span := telemetry.StartSpan(r.Context(), "HandleSubmission")
-	defer span.End()
+type UpdateTripStatusRequest struct {
+	Status string `json:"status" validate:"required,oneof=ACCEPTED STARTED COMPLETED CANCELLED"`
+}
 
-	var requestPayload RequestPayload
+type ReviewRequest struct {
+	Rating  int    `json:"rating" validate:"required,min=1,max=5"`
+	Comment string `json:"comment,omitempty"`
+}
 
-	err := request.ReadAndValidate(w, r, &requestPayload)
-	if request.HandleError(w, err) {
-		return
-	}
-
-	switch requestPayload.Action {
-	case "auth":
-		if requestPayload.Auth == nil {
-			response.BadRequest(w, "auth payload is required for auth action")
-			return
-		}
-		// Validate the auth payload
-		if err := request.Validate(requestPayload.Auth); err != nil {
-			request.HandleError(w, err)
-			return
-		}
-		app.authenticateViaGRPC(w, r.WithContext(ctx), *requestPayload.Auth)
-	case "log":
-		if requestPayload.Log == nil {
-			response.BadRequest(w, "log payload is required for log action")
-			return
-		}
-		// Validate the log payload
-		if err := request.Validate(requestPayload.Log); err != nil {
-			request.HandleError(w, err)
-			return
-		}
-		app.logItemViaGRPCClient(w, r.WithContext(ctx), *requestPayload.Log)
-	case "location":
-		if requestPayload.Location == nil {
-			response.BadRequest(w, "location payload is required for location action")
-			return
-		}
-		// Validate the location payload
-		if err := request.Validate(requestPayload.Location); err != nil {
-			request.HandleError(w, err)
-			return
-		}
-		app.handleLocationRequest(w, r.WithContext(ctx), *requestPayload.Location)
-	default:
-		response.BadRequest(w, "Unknown action")
-	}
+func (app *Config) Broker(w http.ResponseWriter, r *http.Request) {
+	response.Success(w, "Hit the broker", nil)
 }
 
 // authenticateViaGRPC handles authentication using gRPC client
@@ -140,31 +102,22 @@ func (app *Config) logItemViaGRPCClient(w http.ResponseWriter, r *http.Request, 
 	response.Success(w, "Logged via gRPC", nil)
 }
 
-// handleLocationRequest routes location-related requests to appropriate handlers
-func (app *Config) handleLocationRequest(w http.ResponseWriter, r *http.Request, loc LocationPayload) {
-	ctx, span := telemetry.StartSpan(r.Context(), "handleLocationRequest")
-	defer span.End()
-
-	switch loc.Action {
-	case "set":
-		app.setLocationViaGRPC(w, r.WithContext(ctx), loc)
-	case "get":
-		app.getLocationViaGRPC(w, r.WithContext(ctx), loc)
-	case "nearest":
-		app.findNearestUsersViaGRPC(w, r.WithContext(ctx), loc)
-	case "all":
-		app.getAllLocationsViaGRPC(w, r.WithContext(ctx))
-	default:
-		response.BadRequest(w, "Unknown location action. Use: set, get, nearest, or all")
-	}
-}
-
 // setLocationViaGRPC sets a user's location using gRPC
-func (app *Config) setLocationViaGRPC(w http.ResponseWriter, r *http.Request, loc LocationPayload) {
+func (app *Config) setLocationViaGRPC(w http.ResponseWriter, r *http.Request) {
 	ctx, span := telemetry.StartSpan(r.Context(), "setLocationViaGRPC")
 	defer span.End()
-
-	resp, err := app.SetLocationViaGRPC(ctx, loc.UserID, loc.Latitude, loc.Longitude, loc.Speed, loc.Heading, loc.Timestamp)
+	var loc LocationPayload
+	err := request.ReadAndValidate(w, r, &loc)
+	if request.HandleError(w, err) {
+		return
+	}
+	claims, err := app.GetClaims(r.Context())
+	if err != nil {
+		response.Unauthorized(w, "Unauthorized: "+err.Error())
+		return
+	}
+	userID := int(claims.UserID)
+	resp, err := app.SetLocationViaGRPC(ctx, userID, claims.Role, loc.Latitude, loc.Longitude, loc.Speed, loc.Heading, loc.Timestamp)
 	if err != nil {
 		response.InternalServerError(w, "Failed to set location")
 		return
@@ -191,11 +144,17 @@ func (app *Config) setLocationViaGRPC(w http.ResponseWriter, r *http.Request, lo
 }
 
 // getLocationViaGRPC gets a user's location using gRPC
-func (app *Config) getLocationViaGRPC(w http.ResponseWriter, r *http.Request, loc LocationPayload) {
+func (app *Config) getLocationViaGRPC(w http.ResponseWriter, r *http.Request) {
 	ctx, span := telemetry.StartSpan(r.Context(), "getLocationViaGRPC")
 	defer span.End()
 
-	resp, err := app.GetLocationViaGRPC(ctx, loc.UserID)
+	claims, err := app.GetClaims(r.Context())
+	if err != nil {
+		response.Unauthorized(w, "Unauthorized: "+err.Error())
+		return
+	}
+
+	resp, err := app.GetLocationViaGRPC(ctx, int(claims.UserID))
 	if err != nil {
 		response.InternalServerError(w, "Failed to get location")
 		return
@@ -223,9 +182,19 @@ func (app *Config) getLocationViaGRPC(w http.ResponseWriter, r *http.Request, lo
 }
 
 // findNearestUsersViaGRPC finds nearest users using gRPC
-func (app *Config) findNearestUsersViaGRPC(w http.ResponseWriter, r *http.Request, loc LocationPayload) {
+func (app *Config) findNearestUsersViaGRPC(w http.ResponseWriter, r *http.Request) {
 	ctx, span := telemetry.StartSpan(r.Context(), "findNearestUsersViaGRPC")
 	defer span.End()
+	var loc LocationPayload
+	err := request.ReadAndValidate(w, r, &loc)
+	if request.HandleError(w, err) {
+		return
+	}
+	claims, err := app.GetClaims(r.Context())
+	if err != nil {
+		response.Unauthorized(w, "Unauthorized: "+err.Error())
+		return
+	}
 
 	topN := loc.TopN
 	if topN <= 0 {
@@ -237,7 +206,7 @@ func (app *Config) findNearestUsersViaGRPC(w http.ResponseWriter, r *http.Reques
 		radius = 10.0
 	}
 
-	resp, err := app.FindNearestUsersViaGRPC(ctx, loc.UserID, topN, radius)
+	resp, err := app.FindNearestUsersViaGRPC(ctx, int(claims.UserID), topN, radius)
 	if err != nil {
 		response.InternalServerError(w, "Failed to find nearest users")
 		return
@@ -305,4 +274,355 @@ func (app *Config) getAllLocationsViaGRPC(w http.ResponseWriter, r *http.Request
 	}
 
 	response.Success(w, "All locations retrieved successfully", payload)
+}
+
+func (app *Config) CreateTrip(w http.ResponseWriter, r *http.Request) {
+	ctx, span := telemetry.StartSpan(r.Context(), "CreateTrip")
+	defer span.End()
+
+	claims, err := app.GetClaims(r.Context())
+	if err != nil {
+		response.Unauthorized(w, "Unauthorized: "+err.Error())
+		return
+	}
+
+	var tripReq CreateTripRequest
+	err = request.ReadAndValidate(w, r, &tripReq)
+	if request.HandleError(w, err) {
+		response.BadRequest(w, "Invalid request payload: "+err.Error())
+		return
+	}
+	resp, err := app.CreateTripViaGRPC(ctx,
+		int(claims.UserID),
+		tripReq.OriginLat,
+		tripReq.OriginLng,
+		tripReq.DestLat,
+		tripReq.DestLng,
+		tripReq.PaymentMethod,
+	)
+	if err != nil {
+		response.InternalServerError(w, "Failed to create trip: "+err.Error())
+		return
+	}
+	response.Success(w, "Trip created successfully", resp)
+}
+
+func (app *Config) AcceptTrip(w http.ResponseWriter, r *http.Request) {
+	ctx, span := telemetry.StartSpan(r.Context(), "AcceptTrip")
+	defer span.End()
+
+	claims, err := app.GetClaims(r.Context())
+	if err != nil {
+		response.Unauthorized(w, "Unauthorized: "+err.Error())
+		return
+	}
+
+	tripID := chi.URLParam(r, "tripID")
+	if tripID == "" {
+		response.BadRequest(w, "Invalid trip ID")
+		return
+	}
+	tripIDInt, err := strconv.Atoi(tripID)
+	if err != nil {
+		response.BadRequest(w, "Trip ID must be an integer")
+		return
+	}
+	resp, err := app.AcceptTripViaGRPC(ctx, int(claims.UserID), tripIDInt)
+	if err != nil || !resp.Success {
+		response.InternalServerError(w, "Failed to accept trip: "+err.Error())
+		return
+	}
+	response.Success(w, "Trip accepted successfully", nil)
+}
+
+func (app *Config) RejectTrip(w http.ResponseWriter, r *http.Request) {
+	ctx, span := telemetry.StartSpan(r.Context(), "RejectTrip")
+	defer span.End()
+
+	claims, err := app.GetClaims(r.Context())
+	if err != nil {
+		response.Unauthorized(w, "Unauthorized: "+err.Error())
+		return
+	}
+
+	tripID := chi.URLParam(r, "tripID")
+	if tripID == "" {
+		response.BadRequest(w, "Invalid trip ID")
+		return
+	}
+	tripIDInt, err := strconv.Atoi(tripID)
+	if err != nil {
+		response.BadRequest(w, "Trip ID must be an integer")
+		return
+	}
+	resp, err := app.RejectTripViaGRPC(ctx, int(claims.UserID), tripIDInt)
+	if err != nil || !resp.Success {
+		response.InternalServerError(w, "Failed to reject trip: "+err.Error())
+		return
+	}
+	response.Success(w, "Trip rejected successfully", nil)
+}
+
+func (app *Config) GetSuggestedDriver(w http.ResponseWriter, r *http.Request) {
+	ctx, span := telemetry.StartSpan(r.Context(), "GetSuggestedDriver")
+	defer span.End()
+
+	_, err := app.GetClaims(r.Context())
+	if err != nil {
+		response.Unauthorized(w, "Unauthorized: "+err.Error())
+		return
+	}
+
+	tripID := chi.URLParam(r, "tripID")
+	if tripID == "" {
+		response.BadRequest(w, "Invalid trip ID")
+		return
+	}
+	logger.Info("Trip ID:", zap.String("tripId from URL", tripID))
+	tripIDInt, err := strconv.Atoi(tripID)
+	if err != nil {
+		response.BadRequest(w, "Trip ID must be an integer")
+		return
+	}
+
+	resp, err := app.GetSuggestedDriverViaGRPC(ctx, tripIDInt)
+	if err != nil {
+		response.InternalServerError(w, "Failed to get suggested driver: "+err.Error())
+		return
+	}
+	response.Success(w, "Suggested driver retrieved successfully", resp)
+}
+
+func (app *Config) GetTripDetails(w http.ResponseWriter, r *http.Request) {
+	ctx, span := telemetry.StartSpan(r.Context(), "GetTripDetails")
+	defer span.End()
+
+	claims, err := app.GetClaims(r.Context())
+	if err != nil {
+		response.Unauthorized(w, "Unauthorized: "+err.Error())
+		return
+	}
+	logger.Info("Request URL", zap.String("URL", r.URL.Path))
+	for key := range chi.RouteContext(r.Context()).URLParams.Keys {
+		logger.Info("Param key:", zap.Any("key", chi.RouteContext(r.Context()).URLParams.Keys[key]))
+	}
+	tripID := chi.URLParam(r, "tripID")
+	logger.Info("Trip ID:", zap.String("tripId from URL", tripID))
+	if tripID == "" {
+		response.BadRequest(w, "Invalid trip ID")
+		return
+	}
+	tripIDInt, err := strconv.Atoi(tripID)
+	if err != nil {
+		response.BadRequest(w, "Trip ID must be an integer")
+		return
+	}
+
+	resp, err := app.GetTripDetailViaGRPC(ctx, tripIDInt, int(claims.UserID))
+	if err != nil {
+		response.InternalServerError(w, "Failed to get trip details: "+err.Error())
+		return
+	}
+	response.Success(w, "Trip details retrieved successfully", resp)
+}
+
+func (app *Config) GetTripsByPassenger(w http.ResponseWriter, r *http.Request) {
+	ctx, span := telemetry.StartSpan(r.Context(), "GetTripsByPassenger")
+	defer span.End()
+
+	claims, err := app.GetClaims(r.Context())
+	if err != nil {
+		response.Unauthorized(w, "Unauthorized: "+err.Error())
+		return
+	}
+
+	resp, err := app.GetTripsByPassengerViaGRPC(ctx, int(claims.UserID))
+	if err != nil {
+		response.InternalServerError(w, "Failed to get trips by passenger: "+err.Error())
+		return
+	}
+	response.Success(w, "Trips by passenger retrieved successfully", resp)
+}
+
+func (app *Config) GetTripsByDriver(w http.ResponseWriter, r *http.Request) {
+	ctx, span := telemetry.StartSpan(r.Context(), "GetTripsByDriver")
+	defer span.End()
+
+	claims, err := app.GetClaims(r.Context())
+	if err != nil {
+		response.Unauthorized(w, "Unauthorized: "+err.Error())
+		return
+	}
+
+	resp, err := app.GetTripsByDriverViaGRPC(ctx, int(claims.UserID))
+	if err != nil {
+		response.InternalServerError(w, "Failed to get trips by driver: "+err.Error())
+		return
+	}
+	response.Success(w, "Trips by driver retrieved successfully", resp)
+}
+
+func (app *Config) GetAllTrips(w http.ResponseWriter, r *http.Request) {
+	ctx, span := telemetry.StartSpan(r.Context(), "GetAllTrips")
+	defer span.End()
+
+	limit := r.URL.Query().Get("limit")
+	page := r.URL.Query().Get("page")
+	limitInt, err := strconv.Atoi(limit)
+	if err != nil || limitInt <= 0 {
+		limitInt = 10
+	}
+	pageInt, err := strconv.Atoi(page)
+	if err != nil || pageInt <= 0 {
+		pageInt = 1
+	}
+	_, err = app.GetClaims(r.Context())
+	if err != nil {
+		response.Unauthorized(w, "Unauthorized: "+err.Error())
+		return
+	}
+	resp, err := app.GetAllTripsViaGRPC(ctx, pageInt, limitInt)
+	if err != nil {
+		response.InternalServerError(w, "Failed to get all trips: "+err.Error())
+		return
+	}
+	response.Success(w, "All trips retrieved successfully", resp)
+}
+
+func (app *Config) UpdateTripStatus(w http.ResponseWriter, r *http.Request) {
+	ctx, span := telemetry.StartSpan(r.Context(), "UpdateTripStatus")
+	defer span.End()
+
+	claims, err := app.GetClaims(r.Context())
+	if err != nil {
+		response.Unauthorized(w, "Unauthorized: "+err.Error())
+		return
+	}
+
+	tripID := chi.URLParam(r, "tripID")
+	if tripID == "" {
+		response.BadRequest(w, "Invalid trip ID")
+		return
+	}
+	tripIDInt, err := strconv.Atoi(tripID)
+	if err != nil {
+		response.BadRequest(w, "Trip ID must be an integer")
+		return
+	}
+
+	var statusReq UpdateTripStatusRequest
+	err = request.ReadAndValidate(w, r, &statusReq)
+	if request.HandleError(w, err) {
+		response.BadRequest(w, "Invalid request payload: "+err.Error())
+		return
+	}
+
+	resp, err := app.UpdateTripStatusViaGRPC(ctx,
+		tripIDInt,
+		int(claims.UserID),
+		statusReq.Status,
+	)
+	if err != nil || !resp.Success {
+		response.InternalServerError(w, "Failed to update trip status: "+err.Error())
+		return
+	}
+	response.Success(w, "Trip status updated successfully", nil)
+}
+
+func (app *Config) CancelTrip(w http.ResponseWriter, r *http.Request) {
+	ctx, span := telemetry.StartSpan(r.Context(), "CancelTrip")
+	defer span.End()
+
+	claims, err := app.GetClaims(r.Context())
+	if err != nil {
+		response.Unauthorized(w, "Unauthorized: "+err.Error())
+		return
+	}
+
+	tripID := chi.URLParam(r, "tripID")
+	if tripID == "" {
+		response.BadRequest(w, "Invalid trip ID")
+		return
+	}
+	tripIDInt, err := strconv.Atoi(tripID)
+	if err != nil {
+		response.BadRequest(w, "Trip ID must be an integer")
+		return
+	}
+
+	resp, err := app.CancelTripViaGRPC(ctx, tripIDInt, int(claims.UserID))
+	if err != nil || !resp.Success {
+		response.InternalServerError(w, "Failed to cancel trip: "+err.Error())
+		return
+	}
+	response.Success(w, "Trip cancelled successfully", nil)
+}
+
+func (app *Config) SubmitReview(w http.ResponseWriter, r *http.Request) {
+	ctx, span := telemetry.StartSpan(r.Context(), "SubmitReview")
+	defer span.End()
+
+	claims, err := app.GetClaims(r.Context())
+	if err != nil {
+		response.Unauthorized(w, "Unauthorized: "+err.Error())
+		return
+	}
+
+	tripID := chi.URLParam(r, "tripID")
+	if tripID == "" {
+		response.BadRequest(w, "Invalid trip ID")
+		return
+	}
+	tripIDInt, err := strconv.Atoi(tripID)
+	if err != nil {
+		response.BadRequest(w, "Trip ID must be an integer")
+		return
+	}
+
+	var reviewReq ReviewRequest
+	err = request.ReadAndValidate(w, r, &reviewReq)
+	if request.HandleError(w, err) {
+		response.BadRequest(w, "Invalid request payload: "+err.Error())
+		return
+	}
+
+	resp, err := app.SubmitReviewViaGRPC(ctx,
+		tripIDInt,
+		int(claims.UserID),
+		reviewReq.Rating,
+		reviewReq.Comment,
+	)
+	if err != nil || !resp.Success {
+		response.InternalServerError(w, "Failed to submit review: "+err.Error())
+		return
+	}
+	response.Success(w, "Review submitted successfully", nil)
+}
+func (app *Config) GetTripReview(w http.ResponseWriter, r *http.Request) {
+	ctx, span := telemetry.StartSpan(r.Context(), "GetTripReview")
+	defer span.End()
+
+	claims, err := app.GetClaims(r.Context())
+	if err != nil {
+		response.Unauthorized(w, "Unauthorized: "+err.Error())
+		return
+	}
+
+	tripID := chi.URLParam(r, "tripID")
+	if tripID == "" {
+		response.BadRequest(w, "Invalid trip ID")
+		return
+	}
+	tripIDInt, err := strconv.Atoi(tripID)
+	if err != nil {
+		response.BadRequest(w, "Trip ID must be an integer")
+		return
+	}
+
+	resp, err := app.GetReviewViaGRPC(ctx, tripIDInt, int(claims.UserID))
+	if err != nil {
+		response.InternalServerError(w, "Failed to get trip review: "+err.Error())
+		return
+	}
+	response.Success(w, "Trip review retrieved successfully", resp)
 }

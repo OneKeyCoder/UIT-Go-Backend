@@ -32,7 +32,7 @@ func (h *Handlers) SetCurrentLocation(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate required fields
-	if location.UserID == "" {
+	if location.UserID == 0 {
 		h.errorJSON(w, errors.New("user_id is required"), http.StatusBadRequest)
 		return
 	}
@@ -59,8 +59,12 @@ func (h *Handlers) GetCurrentLocation(w http.ResponseWriter, r *http.Request) {
 		h.errorJSON(w, errors.New("user_id query parameter is required"), http.StatusBadRequest)
 		return
 	}
-
-	location, err := h.ser.GetCurrentLocation(*h.ctx, userID)
+	tempUserID, err := strconv.Atoi(userID)
+	if err != nil {
+		h.errorJSON(w, errors.New("user_id must be an integer"), http.StatusBadRequest)
+		return
+	}
+	location, err := h.ser.GetCurrentLocation(*h.ctx, tempUserID)
 	if err != nil {
 		h.errorJSON(w, err, http.StatusInternalServerError)
 		return
@@ -109,8 +113,12 @@ func (h *Handlers) FindNearestUsers(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-
-	locations, err := h.ser.FindTopNearestUsers(*h.ctx, userID, topN, radius)
+	tempUserID, err := strconv.Atoi(userID)
+	if err != nil {
+		h.errorJSON(w, errors.New("user_id must be an integer"), http.StatusBadRequest)
+		return
+	}
+	locations, err := h.ser.FindTopNearestUsers(*h.ctx, tempUserID, topN, radius)
 	if err != nil {
 		h.errorJSON(w, err, http.StatusInternalServerError)
 		return

@@ -3,11 +3,11 @@ package main
 import (
 	"net/http"
 
+	commonMiddleware "github.com/OneKeyCoder/UIT-Go-Backend/common/middleware"
+	"github.com/OneKeyCoder/UIT-Go-Backend/common/request"
 	"github.com/didip/tollbooth/v7"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
-	commonMiddleware "github.com/OneKeyCoder/UIT-Go-Backend/common/middleware"
-	"github.com/OneKeyCoder/UIT-Go-Backend/common/request"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -56,8 +56,7 @@ func (app *Config) routes() http.Handler {
 
 	// Broker routes
 	mux.Post("/", app.Broker)
-	mux.Post("/handle", app.HandleSubmission)
-	
+
 	// gRPC-based routes (using persistent clients with interceptors)
 	mux.Post("/grpc/auth", func(w http.ResponseWriter, r *http.Request) {
 		var authPayload AuthPayload
@@ -67,7 +66,7 @@ func (app *Config) routes() http.Handler {
 		}
 		app.authenticateViaGRPC(w, r, authPayload)
 	})
-	
+
 	mux.Post("/grpc/log", func(w http.ResponseWriter, r *http.Request) {
 		var logPayload LogPayload
 		err := request.ReadAndValidate(w, r, &logPayload)
@@ -77,5 +76,28 @@ func (app *Config) routes() http.Handler {
 		app.logItemViaGRPCClient(w, r, logPayload)
 	})
 
+	mux.Route("/location", func(r chi.Router) {
+		r.Use(app.AuthRequired)
+		r.Get("/me", app.getLocationViaGRPC)
+		r.Post("/", app.setLocationViaGRPC)
+		r.Get("/nearest", app.findNearestUsersViaGRPC)
+		r.Get("/", app.getAllLocationsViaGRPC)
+	})
+
+	mux.Route("/trip", func(r chi.Router) {
+		r.Use(app.AuthRequired)
+		r.Post("/", app.CreateTrip)
+		r.Put("/accept/{tripID}", app.AcceptTrip)
+		r.Put("/reject/{tripID}", app.RejectTrip)
+		r.Get("/", app.GetAllTrips)
+		r.Get("/{tripID}", app.GetTripDetails)
+		r.Get("/user", app.GetTripsByPassenger)
+		r.Get("/driver", app.GetTripsByDriver)
+		r.Get("/suggested/{tripID}", app.GetSuggestedDriver)
+		r.Put("/status/{tripID}", app.UpdateTripStatus)
+		r.Put("/cancel/{tripID}", app.CancelTrip)
+		r.Put("/review/{tripID}", app.SubmitReview)
+		r.Get("/review/{tripID}", app.GetTripReview)
+	})
 	return mux
 }

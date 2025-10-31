@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strconv"
 
 	location_service "location-service/internal"
 
@@ -23,10 +24,11 @@ type LocationServer struct {
 }
 
 func (s *LocationServer) SetLocation(ctx context.Context, req *pb.SetLocationRequest) (*pb.SetLocationResponse, error) {
-	logger.Info("gRPC SetLocation called", zap.String("user_id", req.UserId))
+	logger.Info("gRPC SetLocation called", zap.String("user_id", strconv.Itoa(int(req.UserId))))
 
 	location := &location_service.CurrentLocation{
-		UserID:    req.UserId,
+		UserID:    int(req.UserId),
+		Role:      req.Role,
 		Latitude:  req.Latitude,
 		Longitude: req.Longitude,
 		Speed:     req.Speed,
@@ -47,7 +49,8 @@ func (s *LocationServer) SetLocation(ctx context.Context, req *pb.SetLocationReq
 		Success: true,
 		Message: "Location updated successfully",
 		Location: &pb.Location{
-			UserId:    location.UserID,
+			UserId:    int32(location.UserID),
+			Role:      location.Role,
 			Latitude:  location.Latitude,
 			Longitude: location.Longitude,
 			Speed:     location.Speed,
@@ -58,9 +61,9 @@ func (s *LocationServer) SetLocation(ctx context.Context, req *pb.SetLocationReq
 }
 
 func (s *LocationServer) GetLocation(ctx context.Context, req *pb.GetLocationRequest) (*pb.GetLocationResponse, error) {
-	logger.Info("gRPC GetLocation called", zap.String("user_id", req.UserId))
+	logger.Info("gRPC GetLocation called", zap.String("user_id", strconv.Itoa(int(req.UserId))))
 
-	location, err := s.service.GetCurrentLocation(ctx, req.UserId)
+	location, err := s.service.GetCurrentLocation(ctx, int(req.UserId))
 	if err != nil {
 		logger.Error("Failed to get location", zap.Error(err))
 		return &pb.GetLocationResponse{
@@ -80,7 +83,8 @@ func (s *LocationServer) GetLocation(ctx context.Context, req *pb.GetLocationReq
 		Success: true,
 		Message: "Location retrieved successfully",
 		Location: &pb.Location{
-			UserId:    location.UserID,
+			UserId:    int32(location.UserID),
+			Role:      location.Role,
 			Latitude:  location.Latitude,
 			Longitude: location.Longitude,
 			Speed:     location.Speed,
@@ -93,7 +97,7 @@ func (s *LocationServer) GetLocation(ctx context.Context, req *pb.GetLocationReq
 
 func (s *LocationServer) FindNearestUsers(ctx context.Context, req *pb.FindNearestUsersRequest) (*pb.FindNearestUsersResponse, error) {
 	logger.Info("gRPC FindNearestUsers called",
-		zap.String("user_id", req.UserId),
+		zap.String("user_id", strconv.Itoa(int(req.UserId))),
 		zap.Int32("top_n", req.TopN),
 		zap.Float64("radius", req.Radius))
 
@@ -107,7 +111,7 @@ func (s *LocationServer) FindNearestUsers(ctx context.Context, req *pb.FindNeare
 		radius = 10.0
 	}
 
-	locations, err := s.service.FindTopNearestUsers(ctx, req.UserId, topN, radius)
+	locations, err := s.service.FindTopNearestUsers(ctx, int(req.UserId), topN, radius)
 	if err != nil {
 		logger.Error("Failed to find nearest users", zap.Error(err))
 		return &pb.FindNearestUsersResponse{
@@ -119,7 +123,8 @@ func (s *LocationServer) FindNearestUsers(ctx context.Context, req *pb.FindNeare
 	pbLocations := make([]*pb.Location, 0, len(locations))
 	for _, loc := range locations {
 		pbLocations = append(pbLocations, &pb.Location{
-			UserId:    loc.UserID,
+			UserId:    int32(loc.UserID),
+			Role:      loc.Role,
 			Latitude:  loc.Latitude,
 			Longitude: loc.Longitude,
 			Speed:     loc.Speed,
@@ -151,7 +156,7 @@ func (s *LocationServer) GetAllLocations(ctx context.Context, req *pb.GetAllLoca
 	pbLocations := make([]*pb.Location, 0, len(locations))
 	for _, loc := range locations {
 		pbLocations = append(pbLocations, &pb.Location{
-			UserId:    loc.UserID,
+			UserId:    int32(loc.UserID),
 			Latitude:  loc.Latitude,
 			Longitude: loc.Longitude,
 			Speed:     loc.Speed,

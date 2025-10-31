@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"logger-service/data"
+	"math"
 	"net/http"
 	"os"
 	"os/signal"
@@ -132,9 +133,9 @@ func connectToMongo() (*mongo.Client, error) {
 	})
 
 	// Connection pooling configuration
-	clientOptions.SetMaxPoolSize(50)                        // Maximum connections
-	clientOptions.SetMinPoolSize(10)                        // Minimum idle connections
-	clientOptions.SetMaxConnIdleTime(30 * time.Second)     // Close idle connections after 30s
+	clientOptions.SetMaxPoolSize(50)                   // Maximum connections
+	clientOptions.SetMinPoolSize(10)                   // Minimum idle connections
+	clientOptions.SetMaxConnIdleTime(30 * time.Second) // Close idle connections after 30s
 
 	c, err := mongo.Connect(context.TODO(), clientOptions)
 	if err != nil {
@@ -147,10 +148,28 @@ func connectToMongo() (*mongo.Client, error) {
 }
 
 func connectToRabbitMQ() (*amqp.Connection, error) {
-	rabbitURL := "amqp://guest:guest@rabbitmq"
-	conn, err := amqp.Dial(rabbitURL)
-	if err != nil {
-		return nil, err
+	var counts int64
+	var backOff = 1 * time.Second
+	var connection *amqp.Connection
+
+	for {
+		c, err := amqp.Dial("amqp://guest:guest@rabbitmq")
+		if err != nil {
+			logger.Info("RabbitMQ not yet ready...")
+			counts++
+		} else {
+			logger.Info("Connected to rabbitmq")
+			connection = c
+			break
+		}
+
+		if counts > 5 {
+			return nil, err
+		}
+		backOff = time.Duration(math.Pow(float64(counts), 2)) * time.Second
+		logger.Info("backing off...")
+		time.Sleep(backOff)
+		continue
 	}
-	return conn, nil
+	return connection, nil
 }
