@@ -3,6 +3,7 @@ GATEWAY_BINARY=gatewayApp
 AUTH_BINARY=authApp
 LOGGER_BINARY=loggerServiceApp
 LOCATION_BINARY=locationServiceApp
+TRIP_BINARY=tripServiceApp
 
 ## help: Display this help message
 help:
@@ -24,7 +25,7 @@ up:
 	@echo Docker images started!
 
 ## up_build: stops docker-compose (if running), builds all projects and starts docker compose
-up_build: build_gateway build_auth build_logger build_location down
+up_build: build_gateway build_auth build_logger build_location build_trip down
 	@echo "Building and starting docker images..."
 	docker-compose up --build -d
 
@@ -92,4 +93,9 @@ build_auth:
 build_location:
 	@echo Building location binary...
 	chdir ..\location-service && set GOOS=linux&& set GOARCH=amd64&& set CGO_ENABLED=0 && go build -o ${LOCATION_BINARY} ./cmd/api
+	@echo Done!
+
+build_trip:
+	@echo Building trip binary...
+	chdir ..\trip-service && set GOOS=linux&& set GOARCH=amd64&& set CGO_ENABLED=0 && go build -o ${TRIP_BINARY} ./cmd/api
 	@echo Done!

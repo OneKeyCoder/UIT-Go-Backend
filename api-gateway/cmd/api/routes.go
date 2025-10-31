@@ -84,5 +84,20 @@ func (app *Config) routes() http.Handler {
 		r.Get("/", app.getAllLocationsViaGRPC)
 	})
 
+	mux.Route("/trip", func(r chi.Router) {
+		r.Use(app.AuthRequired)
+		r.Post("/", app.CreateTrip)
+		r.Put("/accept/{tripID}", app.AcceptTrip)
+		r.Put("/reject/{tripID}", app.RejectTrip)
+		r.Get("/", app.GetAllTrips)
+		r.Get("/{tripID}", app.GetTripDetails)
+		r.Get("/user", app.GetTripsByPassenger)
+		r.Get("/driver", app.GetTripsByDriver)
+		r.Get("/suggested/{tripID}", app.GetSuggestedDriver)
+		r.Put("/status/{tripID}", app.UpdateTripStatus)
+		r.Put("/cancel/{tripID}", app.CancelTrip)
+		r.Put("/review/{tripID}", app.SubmitReview)
+		r.Get("/review/{tripID}", app.GetTripReview)
+	})
 	return mux
 }

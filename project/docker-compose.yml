@@ -48,9 +48,12 @@ services:
       - "80"
       - "50051"
     depends_on:
-      - postgres
-      - rabbitmq
-      - jaeger
+      rabbitmq:
+        condition: service_healthy
+      postgres:
+        condition: service_started
+      jaeger:
+        condition: service_started
     environment:
       DSN: "host=postgres port=5432 user=postgres password=password dbname=users sslmode=disable timezone=UTC connect_timeout=5"
       JWT_SECRET: "your-secret-key-change-in-production"
@@ -175,3 +178,36 @@ services:
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning
       - ./db-data/grafana/:/var/lib/grafana
+  postgres_trip:
+    image: "postgres:16-alpine"
+    ports:
+      - "5435:5432"
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: trips
+    volumes:
+      - ./db-data/postgres_trip/:/var/lib/postgresql/data/
+      - ./init_db_trip.sql:/docker-entrypoint-initdb.d/init_db_trip.sql
+  trip-service:
+    build:
+      context: ./../trip-service
+      dockerfile: ./../trip-service/trip-service.dockerfile
+    restart: unless-stopped
+    expose:
+      - "80"
+      - "50054"
+    depends_on:
+      postgres_trip:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+      jaeger:
+        condition: service_started
+    environment:
+      DSN: "host=postgres_trip port=5432 user=postgres password=password dbname=trips sslmode=disable timezone=UTC connect_timeout=5"
+      HERE_ID: ${HERE_ID}
+      HERE_SECRET: ${HERE_SECRET}
+      OTEL_EXPORTER: "otlp"
+      OTEL_COLLECTOR_ENDPOINT: "jaeger:4317"
