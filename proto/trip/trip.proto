@@ -1,0 +1,151 @@
+syntax = "proto3";
+
+package trip;
+
+option go_package = "github.com/OneKeyCoder/UIT-Go-Backend/proto/trip";
+
+import "google/protobuf/timestamp.proto";
+
+service TripService {
+  rpc CreateTrip(CreateTripRequest) returns (CreateTripResponse); //
+  rpc AcceptTrip(AcceptTripRequest) returns (MessageResponse); //
+  rpc RejectTrip(RejectTripRequest) returns (MessageResponse); //
+  rpc GetSuggestedDriver(TripIDRequest) returns (GetSuggestedDriverResponse); //
+  rpc GetTripDetail(TripIDRequest) returns (GetTripDetailResponse); //
+  rpc GetTripsByPassenger(GetTripsByUserIDRequest) returns (TripsResponse);
+  rpc GetTripsByDriver(GetTripsByUserIDRequest) returns (TripsResponse);
+  rpc GetAllTrips(GetAllTripsRequest) returns (PageResponse);
+  rpc UpdateTripStatus(UpdateTripStatusRequest) returns (MessageResponse);
+  rpc CancelTrip(CancelTripRequest) returns (MessageResponse);
+  rpc SubmitReview(SubmitReviewRequest) returns (MessageResponse);
+  rpc GetTripReview(TripIDRequest) returns (GetTripReviewResponse);
+}
+
+enum TripStatus {
+  STATUS_UNKNOWN = 0;
+  REQUESTED = 1;
+  ACCEPTED = 2;
+  STARTED = 3;
+  COMPLETED = 4;
+  CANCELLED = 5;
+}
+
+message Trip {
+  int32 id = 1;
+  int32 passenger_id = 2;
+  int32 driver_id = 3;
+
+  double origin_lat = 4;
+  double origin_lng = 5;
+  double dest_lat = 6;
+  double dest_lng = 7;
+
+  TripStatus status = 8;
+  double distance = 9;
+  double fare = 10;
+
+  string payment_method = 11;
+  int32 rating = 12;
+  string review = 13;
+
+  google.protobuf.Timestamp created_at = 14;
+  google.protobuf.Timestamp updated_at = 15;
+  google.protobuf.Timestamp started_at = 16;
+  google.protobuf.Timestamp completed_at = 17;
+  google.protobuf.Timestamp cancelled_at = 18;
+
+  int32 cancel_by_user_id = 19;
+}
+
+
+message CreateTripRequest {
+  int32 passenger_id = 1;
+  double origin_lat = 2;
+  double origin_lng = 3;
+  double dest_lat = 4;
+  double dest_lng = 5;
+  string payment_method = 6;
+}
+
+message CreateTripResponse {
+  Trip trip = 1;
+  float duration = 2;
+}
+
+message AcceptTripRequest {
+  int32 driver_id = 1;
+  int32 trip_id = 2;
+}
+
+message RejectTripRequest {
+  int32 passenger_id = 1;
+  int32 driver_id = 2;
+  int32 trip_id = 3;
+}
+
+message TripIDRequest {
+    int32 passenger_id = 1;
+  int32 trip_id = 2;
+}
+
+message GetTripRequest {
+    int32 user_id = 1;
+    int32 trip_id = 2;
+}
+message GetSuggestedDriverResponse {
+  int32 driver_id = 1;
+}
+
+message GetTripDetailResponse {
+  Trip trip = 1;
+}
+
+message GetTripsByUserIDRequest {
+  int32 user_id = 1;
+}
+
+message TripsResponse {
+  repeated Trip trips = 1;
+}
+
+message GetAllTripsRequest {
+  int32 page = 1;
+  int32 limit = 2;
+}
+
+message UpdateTripStatusRequest {
+  int32 trip_id = 1;
+  int32 driver_id = 2;
+  TripStatus status = 3;
+}
+
+message CancelTripRequest {
+  int32 trip_id = 1;
+  int32 user_id = 2;
+}
+
+message Review {
+  int32 rating = 1;
+  string comment = 2;
+}
+
+message SubmitReviewRequest {
+  int32 trip_id = 1;
+  int32 user_id = 2;
+  Review review = 3;
+}
+
+message GetTripReviewResponse {
+  Review review = 1;
+}
+
+message MessageResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message PageResponse {
+  repeated Trip trips = 1;
+  int32 page = 2;
+  int32 limit = 3;
+}
