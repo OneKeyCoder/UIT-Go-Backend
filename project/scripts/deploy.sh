@@ -70,7 +70,6 @@ write_generated_vars() {
   cat >"${GENERATED_VARS}" <<EOF
 {
   "resource_group_name": "${RESOURCE_GROUP}",
-  "location": "${LOCATION}",
   "environment": "${ENVIRONMENT}",
   "acr_name": "${ACR_NAME}",
   "key_vault_name": "${KEY_VAULT_NAME}",
@@ -244,11 +243,13 @@ if [[ "${SKIP_BUILD}" != "true" ]]; then
   az acr login --name "${ACR_NAME}"
 
   for service in "${SERVICES[@]}"; do
-    context_dir="${REPO_ROOT}/${SERVICE_CONTEXTS[$service]}"
-    dockerfile_path="${context_dir}/${SERVICE_DOCKERFILES[$service]}"
+    context_dir="${REPO_ROOT}"
+    service_dir="${REPO_ROOT}/${SERVICE_CONTEXTS[$service]}"
+    dockerfile_path="${service_dir}/${SERVICE_DOCKERFILES[$service]}"
     image_tag="${REGISTRY_SERVER}/${service}:${TAG}"
 
-    echo "\n==> Building ${service}"
+    echo
+    echo "==> Building ${service}"
     podman build \
       --file "${dockerfile_path}" \
       --tag "${image_tag}" \

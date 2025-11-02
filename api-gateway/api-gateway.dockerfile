@@ -1,6 +1,6 @@
 FROM gcr.io/distroless/static
 
-COPY gatewayApp /
+COPY api-gateway/gatewayApp /
 
 EXPOSE 80
 

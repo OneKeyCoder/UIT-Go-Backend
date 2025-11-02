@@ -1,6 +1,6 @@
 FROM gcr.io/distroless/static
 
-COPY authApp /
+COPY authentication-service/authApp /
 
 EXPOSE 80
 EXPOSE 50051

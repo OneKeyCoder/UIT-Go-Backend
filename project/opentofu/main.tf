@@ -32,6 +32,8 @@ locals {
     Environment = var.environment
     ManagedBy   = "opentofu"
   }, var.additional_tags)
+
+  app_name_prefix = substr(replace("${local.project_name}-${var.environment}", "_", "-"), 0, 32)
 }
 
 ############################
@@ -43,7 +45,7 @@ data "azurerm_resource_group" "this" {
 }
 
 resource "azurerm_log_analytics_workspace" "this" {
-  name                = "${local.project_name}-${var.environment}-law"
+  name                = substr("${local.project_name}-${var.environment}-law", 0, 63)
   location            = data.azurerm_resource_group.this.location
   resource_group_name = data.azurerm_resource_group.this.name
   sku                 = "PerGB2018"
@@ -61,7 +63,7 @@ resource "azurerm_container_registry" "this" {
 }
 
 resource "azurerm_user_assigned_identity" "workload" {
-  name                = "${local.project_name}-${var.environment}-uami"
+  name                = substr("${local.project_name}-${var.environment}-uami", 0, 128)
   resource_group_name = data.azurerm_resource_group.this.name
   location            = data.azurerm_resource_group.this.location
   tags                = local.common_tags
@@ -74,7 +76,7 @@ resource "azurerm_role_assignment" "acr_pull" {
 }
 
 resource "azurerm_container_app_environment" "this" {
-  name                       = "${local.project_name}-${var.environment}-cae"
+  name                       = substr("${local.project_name}-${var.environment}-cae", 0, 63)
   location                   = data.azurerm_resource_group.this.location
   resource_group_name        = data.azurerm_resource_group.this.name
   log_analytics_workspace_id = azurerm_log_analytics_workspace.this.id
@@ -124,15 +126,15 @@ resource "azurerm_role_assignment" "kv_admin" {
 resource "azurerm_container_app" "services" {
   for_each = var.container_apps
 
-  name                         = "${local.project_name}-${var.environment}-${each.key}"
+  name                         = substr(replace("${local.app_name_prefix}-${each.key}", "_", "-"), 0, 32)
   resource_group_name          = data.azurerm_resource_group.this.name
   container_app_environment_id = azurerm_container_app_environment.this.id
-  revision_mode                = lookup(each.value, "revision_mode", "Single")
+  revision_mode                = coalesce(each.value.revision_mode, "Single")
   tags                         = local.common_tags
 
   template {
-    min_replicas = lookup(each.value, "min_replicas", 0)
-    max_replicas = lookup(each.value, "max_replicas", 1)
+    min_replicas = coalesce(each.value.min_replicas, 0)
+    max_replicas = coalesce(each.value.max_replicas, 1)
 
     container {
       name   = each.key
@@ -141,7 +143,7 @@ resource "azurerm_container_app" "services" {
       memory = each.value.memory
 
       dynamic "env" {
-        for_each = lookup(each.value, "environment_variables", {})
+        for_each = coalesce(each.value.environment_variables, {})
         content {
           name  = env.key
           value = env.value
@@ -149,7 +151,7 @@ resource "azurerm_container_app" "services" {
       }
 
       dynamic "env" {
-        for_each = lookup(each.value, "secret_environment_variables", [])
+        for_each = coalesce(each.value.secret_environment_variables, [])
         content {
           name        = env.value.name
           secret_name = env.value.secret_name
@@ -159,11 +161,11 @@ resource "azurerm_container_app" "services" {
   }
 
   dynamic "ingress" {
-    for_each = lookup(each.value, "ingress", null) == null ? [] : [each.value.ingress]
+    for_each = each.value.ingress == null ? [] : [each.value.ingress]
     content {
       external_enabled = ingress.value.external
       target_port      = ingress.value.target_port
-      transport        = lookup(ingress.value, "transport", "auto")
+      transport        = coalesce(ingress.value.transport, "auto")
 
       traffic_weight {
         latest_revision = true
@@ -173,7 +175,7 @@ resource "azurerm_container_app" "services" {
   }
 
   dynamic "secret" {
-    for_each = lookup(each.value, "secrets", [])
+    for_each = coalesce(each.value.secrets, [])
     content {
       name                = secret.value.name
       key_vault_secret_id = secret.value.key_vault_secret_id

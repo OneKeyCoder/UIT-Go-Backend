@@ -1,6 +1,6 @@
 FROM gcr.io/distroless/static
 
-COPY loggerServiceApp /
+COPY logger-service/loggerServiceApp /
 
 EXPOSE 80
 EXPOSE 50052
