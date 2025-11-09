@@ -75,6 +75,7 @@ write_generated_vars() {
   "key_vault_name": "${KEY_VAULT_NAME}",
   "container_apps": {
     "api-gateway": {
+      "app_name": "api-gateway",
       "image_repository": "api-gateway",
       "image_tag": "${TAG}",
       "cpu": 0.5,
@@ -85,32 +86,199 @@ write_generated_vars() {
       },
       "environment_variables": {
         "PORT": "8080",
-        "ENVIRONMENT": "${ENVIRONMENT}"
+        "ENVIRONMENT": "${ENVIRONMENT}",
+        "OTEL_EXPORTER": "otlp",
+        "OTEL_COLLECTOR_ENDPOINT": "jaeger.internal:4317"
       }
     },
     "authentication-service": {
+      "app_name": "authentication-service",
       "image_repository": "authentication-service",
       "image_tag": "${TAG}",
       "cpu": 0.5,
-      "memory": "1Gi"
+      "memory": "1Gi",
+      "environment_variables": {
+        "DSN": "host=postgres.internal port=5432 user=postgres password=password dbname=users sslmode=disable timezone=UTC connect_timeout=5",
+        "JWT_SECRET": "your-secret-key-change-in-production",
+        "JWT_EXPIRY": "24h",
+        "REFRESH_TOKEN_EXPIRY": "168h",
+        "OTEL_EXPORTER": "otlp",
+        "OTEL_COLLECTOR_ENDPOINT": "jaeger.internal:4317"
+      }
     },
     "location-service": {
+      "app_name": "location-service",
       "image_repository": "location-service",
       "image_tag": "${TAG}",
       "cpu": 0.5,
-      "memory": "1Gi"
+      "memory": "1Gi",
+      "environment_variables": {
+        "REDIS_HOST": "redis.internal",
+        "REDIS_PORT": "6379",
+        "REDIS_PASSWORD": "redispassword",
+        "REDIS_DB": "0",
+        "REDIS_TIME_TO_LIVE": "3600",
+        "OTEL_EXPORTER": "otlp",
+        "OTEL_COLLECTOR_ENDPOINT": "jaeger.internal:4317"
+      }
     },
     "logger-service": {
+      "app_name": "logger-service",
       "image_repository": "logger-service",
       "image_tag": "${TAG}",
       "cpu": 0.5,
-      "memory": "1Gi"
+      "memory": "1Gi",
+      "environment_variables": {
+        "MONGO_URL": "mongodb://admin:password@mongo.internal:27017",
+        "OTEL_EXPORTER": "otlp",
+        "OTEL_COLLECTOR_ENDPOINT": "jaeger.internal:4317"
+      }
     },
     "trip-service": {
+      "app_name": "trip-service",
       "image_repository": "trip-service",
       "image_tag": "${TAG}",
       "cpu": 0.75,
-      "memory": "1.5Gi"
+      "memory": "1.5Gi",
+      "environment_variables": {
+        "DSN": "host=postgres-trip.internal port=5432 user=postgres password=password dbname=trips sslmode=disable timezone=UTC connect_timeout=5",
+        "HERE_ID": "${HERE_ID_VALUE}",
+        "HERE_SECRET": "${HERE_SECRET_VALUE}",
+        "OTEL_EXPORTER": "otlp",
+        "OTEL_COLLECTOR_ENDPOINT": "jaeger.internal:4317"
+      }
+    },
+    "postgres": {
+      "app_name": "postgres",
+      "image_uri": "docker.io/library/postgres:16-alpine",
+      "use_acr": false,
+      "cpu": 0.5,
+      "memory": "1Gi",
+      "ingress": {
+        "external": false,
+        "target_port": 5432,
+        "transport": "tcp"
+      },
+      "environment_variables": {
+        "POSTGRES_USER": "postgres",
+        "POSTGRES_PASSWORD": "password",
+        "POSTGRES_DB": "users"
+      }
+    },
+    "postgres_trip": {
+      "app_name": "postgres-trip",
+      "image_uri": "docker.io/library/postgres:16-alpine",
+      "use_acr": false,
+      "cpu": 0.5,
+      "memory": "1Gi",
+      "ingress": {
+        "external": false,
+        "target_port": 5432,
+        "transport": "tcp"
+      },
+      "environment_variables": {
+        "POSTGRES_USER": "postgres",
+        "POSTGRES_PASSWORD": "password",
+        "POSTGRES_DB": "trips"
+      }
+    },
+    "mongo": {
+      "app_name": "mongo",
+      "image_uri": "docker.io/library/mongo:7-jammy",
+      "use_acr": false,
+      "cpu": 0.5,
+      "memory": "1Gi",
+      "ingress": {
+        "external": false,
+        "target_port": 27017,
+        "transport": "tcp"
+      },
+      "environment_variables": {
+        "MONGO_INITDB_DATABASE": "logs",
+        "MONGO_INITDB_ROOT_USERNAME": "admin",
+        "MONGO_INITDB_ROOT_PASSWORD": "password"
+      }
+    },
+    "redis": {
+      "app_name": "redis",
+      "image_uri": "docker.io/library/redis:7-alpine",
+      "use_acr": false,
+      "cpu": 0.25,
+      "memory": "0.5Gi",
+      "command": [
+        "redis-server",
+        "--requirepass",
+        "redispassword"
+      ],
+      "ingress": {
+        "external": false,
+        "target_port": 6379,
+        "transport": "tcp"
+      },
+      "environment_variables": {
+        "REDIS_PASSWORD": "redispassword"
+      }
+    },
+    "rabbitmq": {
+      "app_name": "rabbitmq",
+      "image_uri": "docker.io/library/rabbitmq:3.13-management-alpine",
+      "use_acr": false,
+      "cpu": 0.5,
+      "memory": "1Gi",
+      "ingress": {
+        "external": false,
+        "target_port": 5672,
+        "transport": "tcp"
+      },
+      "environment_variables": {
+        "RABBITMQ_DEFAULT_USER": "guest",
+        "RABBITMQ_DEFAULT_PASS": "guest"
+      }
+    },
+    "jaeger": {
+      "app_name": "jaeger",
+      "image_uri": "docker.io/jaegertracing/jaeger:2.2.0",
+      "use_acr": false,
+      "cpu": 0.5,
+      "memory": "1Gi",
+      "ingress": {
+        "external": false,
+        "target_port": 4317,
+        "transport": "tcp"
+      },
+      "environment_variables": {
+        "COLLECTOR_OTLP_ENABLED": "true"
+      }
+    },
+    "prometheus": {
+      "app_name": "prometheus",
+      "image_uri": "docker.io/prom/prometheus:v3.2.0",
+      "use_acr": false,
+      "cpu": 0.5,
+      "memory": "1Gi",
+      "args": [
+        "--config.file=/etc/prometheus/prometheus.yml",
+        "--storage.tsdb.path=/prometheus"
+      ],
+      "ingress": {
+        "external": false,
+        "target_port": 9090
+      }
+    },
+    "grafana": {
+      "app_name": "grafana",
+      "image_uri": "docker.io/grafana/grafana:11.5.0",
+      "use_acr": false,
+      "cpu": 0.5,
+      "memory": "1Gi",
+      "ingress": {
+        "external": true,
+        "target_port": 3000
+      },
+      "environment_variables": {
+        "GF_SECURITY_ADMIN_PASSWORD": "admin",
+        "GF_USERS_ALLOW_SIGN_UP": "false"
+      }
     }
   }
 }
@@ -128,6 +296,12 @@ RESOURCE_GROUP=""
 LOCATION=""
 ACR_NAME=""
 KEY_VAULT_NAME=""
+HERE_ID_VALUE="${HERE_ID:-}"
+HERE_SECRET_VALUE="${HERE_SECRET:-}"
+
+if [[ -z "${HERE_ID_VALUE}" || -z "${HERE_SECRET_VALUE}" ]]; then
+  echo "Warning: HERE_ID or HERE_SECRET not set; trip-service will be deployed without HERE credentials." >&2
+fi
 
 while [[ $# -gt 0 ]]; do
   case "$1" in

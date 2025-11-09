@@ -1,8 +1,8 @@
 services:
   api-gateway:
     build:
-      context: ./../api-gateway
-      dockerfile: ./../api-gateway/api-gateway.dockerfile
+      context: ./services/api-gateway
+      dockerfile: ./services/api-gateway/api-gateway.dockerfile
     restart: unless-stopped
     ports:
       - "8080:80"
@@ -21,8 +21,8 @@ services:
 
   logger-service:
     build:
-      context: ./../logger-service
-      dockerfile: ./../logger-service/logger-service.dockerfile
+      context: ./services/logger-service
+      dockerfile: ./services/logger-service/logger-service.dockerfile
     restart: unless-stopped
     expose:
       - "80"
@@ -41,8 +41,8 @@ services:
 
   authentication-service:
     build:
-      context: ./../authentication-service
-      dockerfile: ./../authentication-service/authentication-service.dockerfile
+      context: ./services/authentication-service
+      dockerfile: ./services/authentication-service/authentication-service.dockerfile
     restart: unless-stopped
     expose:
       - "80"
@@ -64,7 +64,7 @@ services:
 
   location-service:
     build:
-      context: ./..
+      context: ./services
       dockerfile: ./location-service/location-service.dockerfile
     restart: unless-stopped
     expose:
@@ -192,8 +192,8 @@ services:
       - ./init_db_trip.sql:/docker-entrypoint-initdb.d/init_db_trip.sql
   trip-service:
     build:
-      context: ./../trip-service
-      dockerfile: ./../trip-service/trip-service.dockerfile
+      context: ./services/trip-service
+      dockerfile: ./services/trip-service/trip-service.dockerfile
     restart: unless-stopped
     expose:
       - "80"

@@ -34,6 +34,15 @@ locals {
   }, var.additional_tags)
 
   app_name_prefix = substr(replace("${local.project_name}-${var.environment}", "_", "-"), 0, 32)
+
+  container_apps_expanded = {
+    for name, cfg in var.container_apps :
+    name => merge(cfg, {
+      computed_image    = try(cfg.image_uri, null) != null ? cfg.image_uri : format("%s/%s:%s", azurerm_container_registry.this.login_server, cfg.image_repository, cfg.image_tag)
+      effective_use_acr = try(cfg.use_acr, try(cfg.image_uri, null) == null)
+      computed_name     = try(cfg.app_name, null) != null ? cfg.app_name : substr(replace("${local.app_name_prefix}-${name}", "_", "-"), 0, 32)
+    })
+  }
 }
 
 ############################
@@ -124,9 +133,9 @@ resource "azurerm_role_assignment" "kv_admin" {
 ############################
 
 resource "azurerm_container_app" "services" {
-  for_each = var.container_apps
+  for_each = local.container_apps_expanded
 
-  name                         = substr(replace("${local.app_name_prefix}-${each.key}", "_", "-"), 0, 32)
+  name                         = each.value.computed_name
   resource_group_name          = data.azurerm_resource_group.this.name
   container_app_environment_id = azurerm_container_app_environment.this.id
   revision_mode                = coalesce(each.value.revision_mode, "Single")
@@ -138,9 +147,11 @@ resource "azurerm_container_app" "services" {
 
     container {
       name   = each.key
-      image  = "${azurerm_container_registry.this.login_server}/${each.value.image_repository}:${each.value.image_tag}"
+      image  = each.value.computed_image
       cpu    = each.value.cpu
       memory = each.value.memory
+      command = try(each.value.command, null)
+      args    = try(each.value.args, null)
 
       dynamic "env" {
         for_each = coalesce(each.value.environment_variables, {})
@@ -183,9 +194,12 @@ resource "azurerm_container_app" "services" {
     }
   }
 
-  registry {
-    server   = azurerm_container_registry.this.login_server
-    identity = azurerm_user_assigned_identity.workload.id
+  dynamic "registry" {
+    for_each = each.value.effective_use_acr ? [1] : []
+    content {
+      server   = azurerm_container_registry.this.login_server
+      identity = azurerm_user_assigned_identity.workload.id
+    }
   }
 
   identity {
@@ -251,11 +265,16 @@ variable "additional_tags" {
 variable "container_apps" {
   description = "Microservice definitions to deploy as Azure Container Apps."
   type = map(object({
-    image_repository      = string
-    image_tag             = string
+    image_repository      = optional(string)
+    image_tag             = optional(string)
+    image_uri             = optional(string)
+    use_acr               = optional(bool)
+  app_name              = optional(string)
     cpu                   = number
     memory                = string
     revision_mode         = optional(string)
+  command               = optional(list(string))
+  args                  = optional(list(string))
     min_replicas          = optional(number)
     max_replicas          = optional(number)
     environment_variables = optional(map(string))
