@@ -36,4 +36,6 @@ COPY --from=builder /app/$service/$binary .
 EXPOSE 80
 EXPOSE 50054
 
-CMD ["./${binary}"]
+ENV entrypoint=$binary
+
+ENTRYPOINT ./${entrypoint}
