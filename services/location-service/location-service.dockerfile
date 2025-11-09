@@ -1,4 +1,10 @@
+ARG binary=locationService
+ARG service=location-service
+
 FROM golang:1.25-alpine AS builder
+
+ARG binary
+ARG service
 
 WORKDIR /app
 
@@ -6,27 +12,27 @@ WORKDIR /app
 COPY proto /app/proto
 COPY common /app/common
 
-# Copy location-service
-COPY location-service /app/location-service
+COPY $service /app/$service
 
-# Set working directory to location-service
-WORKDIR /app/location-service
+WORKDIR /app/${service}
 
-# Download dependencies
 RUN go mod download
 
 # Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o locationServiceApp ./cmd/api
+RUN CGO_ENABLED=0 go build -a -installsuffix cgo -o $binary ./cmd/api
 
-# Final stage
+# Runtime stage
 FROM alpine:latest
 
 RUN apk --no-cache add ca-certificates
 
 WORKDIR /app
 
-COPY --from=builder /app/location-service/locationServiceApp .
+ARG binary
+ARG service
+
+COPY --from=builder /app/$service/$binary .
 
 EXPOSE 80
 
-CMD ["./locationServiceApp"]
+CMD ["./${binary}"]

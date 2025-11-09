@@ -1,8 +1,9 @@
 services:
   api-gateway:
     build:
-      context: ./services/api-gateway
-      dockerfile: ./services/api-gateway/api-gateway.dockerfile
+      context: ./services
+      dockerfile: api-gateway/api-gateway.dockerfile
+    image: api-gateway
     restart: unless-stopped
     ports:
       - "8080:80"
@@ -21,8 +22,9 @@ services:
 
   logger-service:
     build:
-      context: ./services/logger-service
-      dockerfile: ./services/logger-service/logger-service.dockerfile
+      context: ./services
+      dockerfile: logger-service/logger-service.dockerfile
+    image: logger-service
     restart: unless-stopped
     expose:
       - "80"
@@ -41,8 +43,9 @@ services:
 
   authentication-service:
     build:
-      context: ./services/authentication-service
-      dockerfile: ./services/authentication-service/authentication-service.dockerfile
+      context: ./services
+      dockerfile: authentication-service/authentication-service.dockerfile
+    image: authentication-service
     restart: unless-stopped
     expose:
       - "80"
@@ -65,7 +68,8 @@ services:
   location-service:
     build:
       context: ./services
-      dockerfile: ./location-service/location-service.dockerfile
+      dockerfile: location-service/location-service.dockerfile
+    image: location-service
     restart: unless-stopped
     expose:
       - "80"
@@ -94,8 +98,8 @@ services:
       POSTGRES_PASSWORD: password
       POSTGRES_DB: users
     volumes:
-      - ./db-data/postgres/:/var/lib/postgresql/data/
-      - ./init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
+      - ${VOLUME_FOLDER_PATH}/postgres/:/var/lib/postgresql/data/
+      - ./utils/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
 
   mongo:
     image: "mongo:7-jammy"
@@ -107,7 +111,7 @@ services:
       MONGO_INITDB_ROOT_USERNAME: admin
       MONGO_INITDB_ROOT_PASSWORD: password
     volumes:
-      - ./db-data/mongo/:/data/db
+      - ${VOLUME_FOLDER_PATH}/mongo/:/data/db
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 30s
@@ -122,7 +126,7 @@ services:
     restart: unless-stopped
     command: redis-server --requirepass redispassword
     volumes:
-      - ./db-data/redis/:/data
+      - ${VOLUME_FOLDER_PATH}/redis/:/data
 
   rabbitmq:
     image: "rabbitmq:3.13-management-alpine"
@@ -134,7 +138,7 @@ services:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
     volumes:
-      - ./db-data/rabbitmq/:/var/lib/rabbitmq/
+      - ${VOLUME_FOLDER_PATH}/rabbitmq/:/var/lib/rabbitmq/
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "ping"]
       interval: 10s
@@ -157,15 +161,15 @@ services:
       - "9090:9090"
     restart: unless-stopped
     volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
-      - ./prometheus-alerts.yml:/etc/prometheus/prometheus-alerts.yml
-      - ./db-data/prometheus/:/prometheus
+      - ./infrastructure/legacy/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./infrastructure/legacy/prometheus-alerts.yml:/etc/prometheus/prometheus-alerts.yml
+      - ${VOLUME_FOLDER_PATH}/prometheus/:/prometheus
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
 
   grafana:
-    image: "grafana/grafana:11.5.0"
+    image: grafana/grafana:12.3.0-19020365962
     ports:
       - "3000:3000"
     restart: unless-stopped
@@ -176,8 +180,9 @@ services:
       GF_SECURITY_ADMIN_PASSWORD: admin
       GF_USERS_ALLOW_SIGN_UP: "false"
     volumes:
-      - ./grafana/provisioning:/etc/grafana/provisioning
-      - ./db-data/grafana/:/var/lib/grafana
+      # - ${VOLUME_FOLDER_PATH}/grafana/provisioning:/etc/grafana/provisioning
+      - ${VOLUME_FOLDER_PATH}/grafana/:/var/lib/grafana
+
   postgres_trip:
     image: "postgres:16-alpine"
     ports:
@@ -188,12 +193,14 @@ services:
       POSTGRES_PASSWORD: password
       POSTGRES_DB: trips
     volumes:
-      - ./db-data/postgres_trip/:/var/lib/postgresql/data/
-      - ./init_db_trip.sql:/docker-entrypoint-initdb.d/init_db_trip.sql
+      - ${VOLUME_FOLDER_PATH}/postgres_trip/:/var/lib/postgresql/data/
+      - ./utils/init_db_trip.sql:/docker-entrypoint-initdb.d/init_db_trip.sql
+
   trip-service:
     build:
-      context: ./services/trip-service
-      dockerfile: ./services/trip-service/trip-service.dockerfile
+      context: ./services
+      dockerfile: trip-service/trip-service.dockerfile
+    image: trip-service
     restart: unless-stopped
     expose:
       - "80"
