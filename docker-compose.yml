@@ -1,3 +1,14 @@
+# TODO: consolidate env vars in .env file instead of hard coding here.
+
+volumes:
+  postgres-data:
+  postgres-trip-data:
+  mongo-data:
+  redis-data:
+  rabbitmq-data:
+  prometheus-data:
+  grafana-data:
+
 services:
   api-gateway:
     build:
@@ -100,8 +111,8 @@ services:
       POSTGRES_PASSWORD: password
       POSTGRES_DB: users
     volumes:
-      - ${VOLUME_FOLDER_PATH}/postgres/:/var/lib/postgresql/data/
-      - ./utils/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
+      - postgres-data:/var/lib/postgresql/data
+      - ./utils/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql:Z
 
   mongo:
     image: "mongo:7-jammy"
@@ -113,7 +124,7 @@ services:
       MONGO_INITDB_ROOT_USERNAME: admin
       MONGO_INITDB_ROOT_PASSWORD: password
     volumes:
-      - ${VOLUME_FOLDER_PATH}/mongo/:/data/db
+      - mongo-data:/data/db
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 30s
@@ -128,7 +139,7 @@ services:
     restart: unless-stopped
     command: redis-server --requirepass redispassword
     volumes:
-      - ${VOLUME_FOLDER_PATH}/redis/:/data
+      - redis-data:/data
 
   rabbitmq:
     image: "rabbitmq:3.13-management-alpine"
@@ -140,7 +151,7 @@ services:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
     volumes:
-      - ${VOLUME_FOLDER_PATH}/rabbitmq/:/var/lib/rabbitmq/
+      - rabbitmq-data:/var/lib/rabbitmq
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "ping"]
       interval: 10s
@@ -163,9 +174,9 @@ services:
       - "9090:9090"
     restart: unless-stopped
     volumes:
-      - ./infrastructure/legacy/prometheus.yml:/etc/prometheus/prometheus.yml
-      - ./infrastructure/legacy/prometheus-alerts.yml:/etc/prometheus/prometheus-alerts.yml
-      - ${VOLUME_FOLDER_PATH}/prometheus/:/prometheus
+      - ./infrastructure/legacy/prometheus.yml:/etc/prometheus/prometheus.yml:Z
+      - ./infrastructure/legacy/prometheus-alerts.yml:/etc/prometheus/prometheus-alerts.yml:Z
+      - prometheus-data:/prometheus
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
@@ -182,8 +193,8 @@ services:
       GF_SECURITY_ADMIN_PASSWORD: admin
       GF_USERS_ALLOW_SIGN_UP: "false"
     volumes:
-      # - ${VOLUME_FOLDER_PATH}/grafana/provisioning:/etc/grafana/provisioning
-      - ${VOLUME_FOLDER_PATH}/grafana/:/var/lib/grafana
+      # - ./compose-volumes/grafana/provisioning:/etc/grafana/provisioning
+      - grafana-data:/var/lib/grafana
 
   postgres_trip:
     image: "postgres:16-alpine"
@@ -195,8 +206,8 @@ services:
       POSTGRES_PASSWORD: password
       POSTGRES_DB: trips
     volumes:
-      - ${VOLUME_FOLDER_PATH}/postgres_trip/:/var/lib/postgresql/data/
-      - ./utils/init_db_trip.sql:/docker-entrypoint-initdb.d/init_db_trip.sql
+      - postgres-trip-data:/var/lib/postgresql/data
+      - ./utils/init_db_trip.sql:/docker-entrypoint-initdb.d/init_db_trip.sql:Z
 
   trip-service:
     build:
