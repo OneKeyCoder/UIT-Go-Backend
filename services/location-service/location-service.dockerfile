@@ -34,6 +34,7 @@ ARG service
 COPY --from=builder /app/$service/$binary .
 
 EXPOSE 80
+EXPOSE 50053
 
 ENV entrypoint=$binary
 
