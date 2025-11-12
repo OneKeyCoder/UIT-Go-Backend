@@ -104,15 +104,17 @@ services:
   postgres:
     image: "postgres:16-alpine"
     ports:
-      - "5434:5432"
+      - "5432:5432"
+    expose:
+      - 5432
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
-      POSTGRES_DB: users
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./utils/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql:Z
+      - ./utils/init_db_trip.sql:/docker-entrypoint-initdb.d/init_db_trip.sql:Z
 
   mongo:
     image: "mongo:7-jammy"
@@ -162,8 +164,9 @@ services:
     image: "jaegertracing/jaeger:2.2.0"
     ports:
       - "16686:16686" # Jaeger UI
-      - "4317:4317" # OTLP gRPC receiver
-      - "4318:4318" # OTLP HTTP receiver
+    expose:
+      - "4317" # OTLP gRPC receiver
+      - "4318" # OTLP HTTP receiver
     restart: unless-stopped
     environment:
       COLLECTOR_OTLP_ENABLED: "true"
@@ -196,19 +199,6 @@ services:
       # - ./compose-volumes/grafana/provisioning:/etc/grafana/provisioning
       - grafana-data:/var/lib/grafana
 
-  postgres_trip:
-    image: "postgres:16-alpine"
-    ports:
-      - "5435:5432"
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: trips
-    volumes:
-      - postgres-trip-data:/var/lib/postgresql/data
-      - ./utils/init_db_trip.sql:/docker-entrypoint-initdb.d/init_db_trip.sql:Z
-
   trip-service:
     build:
       context: ./services
@@ -219,14 +209,14 @@ services:
       - "80"
       - "50054"
     depends_on:
-      postgres_trip:
+      postgres:
         condition: service_started
       rabbitmq:
         condition: service_healthy
       jaeger:
         condition: service_started
     environment:
-      DSN: "host=postgres_trip port=5432 user=postgres password=password dbname=trips sslmode=disable timezone=UTC connect_timeout=5"
+      DSN: "host=postgres port=5432 user=postgres password=password dbname=trips sslmode=disable timezone=UTC connect_timeout=5"
       HERE_ID: ${HERE_ID}
       HERE_SECRET: ${HERE_SECRET}
       OTEL_EXPORTER: "otlp"

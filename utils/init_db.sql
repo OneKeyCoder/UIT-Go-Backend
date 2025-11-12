@@ -1,6 +1,8 @@
--- ============================================
--- UIT-Go Backend - Database Initialization
--- ============================================
+-- Create a new database
+CREATE DATABASE users WITH OWNER = postgres ENCODING = 'UTF8';
+
+-- Connect to the newly created database
+\connect users;
 
 -- Create users table
 CREATE TABLE IF NOT EXISTS users (

@@ -1,3 +1,9 @@
+-- Create a new database
+CREATE DATABASE trips WITH OWNER = postgres ENCODING = 'UTF8';
+
+-- Connect to the newly created database
+\connect trips;
+
 -- Enum
 CREATE TYPE trip_status AS ENUM (
   'REQUESTED',
@@ -8,7 +14,7 @@ CREATE TYPE trip_status AS ENUM (
 );
 
 -- Create table
-CREATE TABLE trips (
+CREATE TABLE IF NOT EXISTS trips (
   id SERIAL PRIMARY KEY,
   passenger_id INT NOT NULL,
   driver_id INT,

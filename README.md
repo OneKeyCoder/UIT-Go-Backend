@@ -20,9 +20,16 @@ And also:
 - project: this shit should be gone in around 1 day.
 - proto
 
-## Instructions
+## Instructions for local development
 
 To start developing (or running locally):
+
+### Dependencies
+
+- Podman (recommended) or Docker installed with Compose.
+- That's it. Plug and play!
+
+### Run
 
 1. Copy `.env.example` file and name it `.env` in the same root folder. Tweak it if needed.
 
@@ -32,6 +39,25 @@ To start developing (or running locally):
 docker compose up
 ```
 
-3. If you make any changes and want to see the result, do a `docker compose down` then `docker compose up` again.
+3. If you make any changes and want to see the result, (optionally do a `docker compose down`) then `docker compose up` again.
 
-TODO finish this
+4. To "clean" the environment, run 
+```bash
+docker compose down -v
+```
+5. To clean everything, including built images, run: 
+```bash
+docker compose down -v --rmi all
+```
+
+## Notes
+
+All volumes used are named volumes, not mounted volumes. This is to avoid permission errors when running on rootless or SELinux environment, etc. and for easier clean-up.
+
+Development environment are managed through a `docker-compose.yml` file, and may drift from the production/staging environment deployed with `opentofu` and CD scripts. This is a trade-off for lightweight local environment with pure containers and Compose, and to utilize managed services (Postgres, Redis,...) provided by the cloud provider (in this case Azure).
+
+## Footnote
+
+Entire deploy flow is made without or with minimal LLM footprint. *All mistakes are my own.*
+
+!TODO finish this
