@@ -1,400 +1,696 @@
 {
-    "info": {
-        "name": "UIT-Go Microservices - Complete Observability Tests",
-        "description": "Complete test collection for all endpoints including SLO monitoring",
-        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
-    },
-    "item": [
-        {
-            "name": "API Gateway Tests",
-            "item": [
-                {
-                    "name": "Health Check (Broker)",
-                    "request": {
-                        "method": "POST",
-                        "header": [
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json"
-                            }
-                        ],
-                        "url": {
-                            "raw": "http://localhost:8080",
-                            "protocol": "http",
-                            "host": [
-                                "localhost"
-                            ],
-                            "port": "8080"
-                        }
-                    }
-                },
-                {
-                    "name": "Handle - Auth Action",
-                    "request": {
-                        "method": "POST",
-                        "header": [
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json"
-                            }
-                        ],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n  \"action\": \"auth\",\n  \"auth\": {\n    \"email\": \"admin@example.com\",\n    \"password\": \"verysecret\"\n  }\n}"
-                        },
-                        "url": {
-                            "raw": "http://localhost:8080/handle",
-                            "protocol": "http",
-                            "host": [
-                                "localhost"
-                            ],
-                            "port": "8080",
-                            "path": [
-                                "handle"
-                            ]
-                        }
-                    }
-                },
-                {
-                    "name": "Handle - Log Action",
-                    "request": {
-                        "method": "POST",
-                        "header": [
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json"
-                            }
-                        ],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n  \"action\": \"log\",\n  \"log\": {\n    \"name\": \"test-event\",\n    \"data\": \"Testing observability with distributed tracing\"\n  }\n}"
-                        },
-                        "url": {
-                            "raw": "http://localhost:8080/handle",
-                            "protocol": "http",
-                            "host": [
-                                "localhost"
-                            ],
-                            "port": "8080",
-                            "path": [
-                                "handle"
-                            ]
-                        }
-                    }
-                },
-                {
-                    "name": "Direct gRPC Auth",
-                    "request": {
-                        "method": "POST",
-                        "header": [
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json"
-                            }
-                        ],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"verysecret\"\n}"
-                        },
-                        "url": {
-                            "raw": "http://localhost:8080/grpc/auth",
-                            "protocol": "http",
-                            "host": [
-                                "localhost"
-                            ],
-                            "port": "8080",
-                            "path": [
-                                "grpc",
-                                "auth"
-                            ]
-                        }
-                    }
-                },
-                {
-                    "name": "Direct gRPC Log",
-                    "request": {
-                        "method": "POST",
-                        "header": [
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json"
-                            }
-                        ],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n  \"name\": \"direct-grpc-test\",\n  \"data\": \"Testing direct gRPC logging endpoint\"\n}"
-                        },
-                        "url": {
-                            "raw": "http://localhost:8080/grpc/log",
-                            "protocol": "http",
-                            "host": [
-                                "localhost"
-                            ],
-                            "port": "8080",
-                            "path": [
-                                "grpc",
-                                "log"
-                            ]
-                        }
-                    }
-                }
-            ]
-        },
-        {
-            "name": "Authentication Service Tests (Direct)",
-            "item": [
-                {
-                    "name": "Register New User",
-                    "request": {
-                        "method": "POST",
-                        "header": [
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json"
-                            }
-                        ],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n  \"email\": \"newuser@example.com\",\n  \"first_name\": \"John\",\n  \"last_name\": \"Doe\",\n  \"password\": \"securepass123\"\n}"
-                        },
-                        "url": {
-                            "raw": "http://localhost:8081/register",
-                            "protocol": "http",
-                            "host": [
-                                "localhost"
-                            ],
-                            "port": "8081",
-                            "path": [
-                                "register"
-                            ]
-                        }
-                    }
-                },
-                {
-                    "name": "Authenticate (Direct - For SLO)",
-                    "request": {
-                        "method": "POST",
-                        "header": [
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json"
-                            }
-                        ],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"verysecret\"\n}"
-                        },
-                        "url": {
-                            "raw": "http://localhost:8081/authenticate",
-                            "protocol": "http",
-                            "host": [
-                                "localhost"
-                            ],
-                            "port": "8081",
-                            "path": [
-                                "authenticate"
-                            ]
-                        }
-                    }
-                },
-                {
-                    "name": "Change Password",
-                    "request": {
-                        "method": "PATCH",
-                        "header": [
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json"
-                            }
-                        ],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n  \"email\": \"admin@example.com\",\n  \"old_password\": \"verysecret\",\n  \"new_password\": \"newsecurepass456\"\n}"
-                        },
-                        "url": {
-                            "raw": "http://localhost:8081/change-password",
-                            "protocol": "http",
-                            "host": [
-                                "localhost"
-                            ],
-                            "port": "8081",
-                            "path": [
-                                "change-password"
-                            ]
-                        }
-                    }
-                }
-            ]
-        },
-        {
-            "name": "Observability Endpoints",
-            "item": [
-                {
-                    "name": "API Gateway Metrics",
-                    "request": {
-                        "method": "GET",
-                        "header": [],
-                        "url": {
-                            "raw": "http://localhost:8080/metrics",
-                            "protocol": "http",
-                            "host": [
-                                "localhost"
-                            ],
-                            "port": "8080",
-                            "path": [
-                                "metrics"
-                            ]
-                        }
-                    }
-                },
-                {
-                    "name": "Auth Service Metrics",
-                    "request": {
-                        "method": "GET",
-                        "header": [],
-                        "url": {
-                            "raw": "http://localhost:8081/metrics",
-                            "protocol": "http",
-                            "host": [
-                                "localhost"
-                            ],
-                            "port": "8081",
-                            "path": [
-                                "metrics"
-                            ]
-                        }
-                    }
-                },
-                {
-                    "name": "Logger Service Metrics",
-                    "request": {
-                        "method": "GET",
-                        "header": [],
-                        "url": {
-                            "raw": "http://localhost:50052/metrics",
-                            "protocol": "http",
-                            "host": [
-                                "localhost"
-                            ],
-                            "port": "50052",
-                            "path": [
-                                "metrics"
-                            ]
-                        }
-                    }
-                }
-            ]
-        },
-        {
-            "name": "Load Testing (Generate Metrics)",
-            "item": [
-                {
-                    "name": "Bulk Auth Requests (Success)",
-                    "event": [
-                        {
-                            "listen": "prerequest",
-                            "script": {
-                                "exec": [
-                                    "// This will run multiple times to generate metrics",
-                                    "pm.sendRequest({",
-                                    "    url: 'http://localhost:8081/authenticate',",
-                                    "    method: 'POST',",
-                                    "    header: 'Content-Type:application/json',",
-                                    "    body: {",
-                                    "        mode: 'raw',",
-                                    "        raw: JSON.stringify({",
-                                    "            email: 'admin@example.com',",
-                                    "            password: 'verysecret'",
-                                    "        })",
-                                    "    }",
-                                    "}, function (err, res) {",
-                                    "    console.log('Bulk request sent');",
-                                    "});"
-                                ],
-                                "type": "text/javascript"
-                            }
-                        }
-                    ],
-                    "request": {
-                        "method": "POST",
-                        "header": [
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json"
-                            }
-                        ],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"verysecret\"\n}"
-                        },
-                        "url": {
-                            "raw": "http://localhost:8081/authenticate",
-                            "protocol": "http",
-                            "host": [
-                                "localhost"
-                            ],
-                            "port": "8081",
-                            "path": [
-                                "authenticate"
-                            ]
-                        }
-                    }
-                },
-                {
-                    "name": "Bulk Auth Requests (Failure)",
-                    "request": {
-                        "method": "POST",
-                        "header": [
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json"
-                            }
-                        ],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"wrongpassword\"\n}"
-                        },
-                        "url": {
-                            "raw": "http://localhost:8081/authenticate",
-                            "protocol": "http",
-                            "host": [
-                                "localhost"
-                            ],
-                            "port": "8081",
-                            "path": [
-                                "authenticate"
-                            ]
-                        }
-                    }
-                },
-                {
-                    "name": "Bulk Handle Requests",
-                    "request": {
-                        "method": "POST",
-                        "header": [
-                            {
-                                "key": "Content-Type",
-                                "value": "application/json"
-                            }
-                        ],
-                        "body": {
-                            "mode": "raw",
-                            "raw": "{\n  \"action\": \"auth\",\n  \"auth\": {\n    \"email\": \"admin@example.com\",\n    \"password\": \"verysecret\"\n  }\n}"
-                        },
-                        "url": {
-                            "raw": "http://localhost:8080/handle",
-                            "protocol": "http",
-                            "host": [
-                                "localhost"
-                            ],
-                            "port": "8080",
-                            "path": [
-                                "handle"
-                            ]
-                        }
-                    }
-                }
-            ]
-        }
-    ]
+	"info": {
+		"_postman_id": "6e5d65e9-8e2c-4db4-9ad6-d4165d6e74c4",
+		"name": "UIT Go Scam",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "39158097"
+	},
+	"item": [
+		{
+			"name": "api gateway",
+			"item": [
+				{
+					"name": "public",
+					"item": [
+						{
+							"name": "auth",
+							"request": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"email\": \"jane.smith@example.com\",\n    \"password\": \"password123\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "http://localhost:8080/grpc/auth",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "8080",
+									"path": [
+										"grpc",
+										"auth"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "log",
+							"request": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n   \"name\" : \"test logging service\",\n   \"data\" : \"test 123 123\"\n}"
+								},
+								"url": {
+									"raw": "http://localhost:8080/grpc/log",
+									"protocol": "http",
+									"host": [
+										"localhost"
+									],
+									"port": "8080",
+									"path": [
+										"grpc",
+										"log"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "require_auth",
+					"item": [
+						{
+							"name": "location",
+							"item": [
+								{
+									"name": "get my location",
+									"protocolProfileBehavior": {
+										"disableBodyPruning": true
+									},
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjozLCJlbWFpbCI6ImphbmUuc21pdGhAZXhhbXBsZS5jb20iLCJyb2xlIjoiZHJpdmVyIiwiZXhwIjoxNzYzMDk1NzI5LCJuYmYiOjE3NjMwMDkzMjksImlhdCI6MTc2MzAwOTMyOX0.YbPWb3X_c6gjsi5mQG3jNEJFsQfD7B9QZV5fhqEL-5s",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [],
+										"body": {
+											"mode": "raw",
+											"raw": ""
+										},
+										"url": {
+											"raw": "http://localhost:8080/location/me",
+											"protocol": "http",
+											"host": [
+												"localhost"
+											],
+											"port": "8080",
+											"path": [
+												"location",
+												"me"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "set my location (user)",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoyLCJlbWFpbCI6ImpvaG4uZG9lQGV4YW1wbGUuY29tIiwicm9sZSI6InVzZXIiLCJleHAiOjE3NjMwOTY2NDUsIm5iZiI6MTc2MzAxMDI0NSwiaWF0IjoxNzYzMDEwMjQ1fQ.KGHaF96IJZg_DeicOvY-x9dsf2lj19y7kqmvXWgJmxY",
+													"type": "string"
+												}
+											]
+										},
+										"method": "POST",
+										"header": [],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n    \"latitude\" : 30.3124,\n    \"longitude\" : 30.2312,\n    \"speed\": 123,\n    \"heading\": \"NE\",\n    \"timestamp\": \"2025-10-09T11:30:00Z\"\n}"
+										},
+										"url": {
+											"raw": "http://localhost:8080/location/",
+											"protocol": "http",
+											"host": [
+												"localhost"
+											],
+											"port": "8080",
+											"path": [
+												"location",
+												""
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "get top nearest driver",
+									"protocolProfileBehavior": {
+										"disableBodyPruning": true
+									},
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoxLCJlbWFpbCI6ImFkbWluQGV4YW1wbGUuY29tIiwicm9sZSI6ImFkbWluIiwiZXhwIjoxNzYzMDk2MzY2LCJuYmYiOjE3NjMwMDk5NjYsImlhdCI6MTc2MzAwOTk2Nn0.HfGd50DEaIXb2xX15gim2aIcU1Wv_ZpTBjhHA-4FhUc",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n    \"top_n\": 10,\n    \"radius\" : 10000\n}",
+											"options": {
+												"raw": {
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "http://localhost:8080/location/nearest",
+											"protocol": "http",
+											"host": [
+												"localhost"
+											],
+											"port": "8080",
+											"path": [
+												"location",
+												"nearest"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "set my location (driver)",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjozLCJlbWFpbCI6ImphbmUuc21pdGhAZXhhbXBsZS5jb20iLCJyb2xlIjoiZHJpdmVyIiwiZXhwIjoxNzYzMDk2NzYyLCJuYmYiOjE3NjMwMTAzNjIsImlhdCI6MTc2MzAxMDM2Mn0.XPm7fmRiOnHiXmamrT-Py8MoohUsu2e6IC-r2iI3AUM",
+													"type": "string"
+												}
+											]
+										},
+										"method": "POST",
+										"header": [],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n    \"latitude\" : 10.3124,\n    \"longitude\" : 10.2312,\n    \"speed\": 123,\n    \"heading\": \"NE\",\n    \"timestamp\": \"2025-10-09T11:30:00Z\"\n}",
+											"options": {
+												"raw": {
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "http://localhost:8080/location/",
+											"protocol": "http",
+											"host": [
+												"localhost"
+											],
+											"port": "8080",
+											"path": [
+												"location",
+												""
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "get all location",
+									"protocolProfileBehavior": {
+										"disableBodyPruning": true
+									},
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjozLCJlbWFpbCI6ImphbmUuc21pdGhAZXhhbXBsZS5jb20iLCJyb2xlIjoiZHJpdmVyIiwiZXhwIjoxNzYzMDk2NzYyLCJuYmYiOjE3NjMwMTAzNjIsImlhdCI6MTc2MzAxMDM2Mn0.XPm7fmRiOnHiXmamrT-Py8MoohUsu2e6IC-r2iI3AUM",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n    \"latitude\" : 10.3124,\n    \"longitude\" : 10.2312,\n    \"speed\": 123,\n    \"heading\": \"NE\",\n    \"timestamp\": \"2025-10-09T11:30:00Z\"\n}"
+										},
+										"url": {
+											"raw": "http://localhost:8080/location/",
+											"protocol": "http",
+											"host": [
+												"localhost"
+											],
+											"port": "8080",
+											"path": [
+												"location",
+												""
+											]
+										}
+									},
+									"response": []
+								}
+							]
+						},
+						{
+							"name": "trip",
+							"item": [
+								{
+									"name": "create trip",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjozLCJlbWFpbCI6ImphbmUuc21pdGhAZXhhbXBsZS5jb20iLCJyb2xlIjoiZHJpdmVyIiwiZXhwIjoxNzYzMDk2NzYyLCJuYmYiOjE3NjMwMTAzNjIsImlhdCI6MTc2MzAxMDM2Mn0.XPm7fmRiOnHiXmamrT-Py8MoohUsu2e6IC-r2iI3AUM",
+													"type": "string"
+												}
+											]
+										},
+										"method": "POST",
+										"header": [],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n    \"origin_lat\": 10.231,\n\t\"origin_lng\": 10.23214,\n\t\"dest_lat\" : 15.12312,\n\t\"dest_lng\": 20.4123,\n\t\"payment_method\": \"card\"\n}"
+										},
+										"url": {
+											"raw": "http://localhost:8080/trip/",
+											"protocol": "http",
+											"host": [
+												"localhost"
+											],
+											"port": "8080",
+											"path": [
+												"trip",
+												""
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "accept trip",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjozLCJlbWFpbCI6ImphbmUuc21pdGhAZXhhbXBsZS5jb20iLCJyb2xlIjoiZHJpdmVyIiwiZXhwIjoxNzYzMDk2NzYyLCJuYmYiOjE3NjMwMTAzNjIsImlhdCI6MTc2MzAxMDM2Mn0.XPm7fmRiOnHiXmamrT-Py8MoohUsu2e6IC-r2iI3AUM",
+													"type": "string"
+												}
+											]
+										},
+										"method": "PUT",
+										"header": [],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n    \"origin_lat\": 10.231,\n\t\"origin_lng\": 10.23214,\n\t\"dest_lat\" : 15.12312,\n\t\"dest_lng\": 20.4123,\n\t\"payment_method\": \"card\"\n}"
+										},
+										"url": {
+											"raw": "http://localhost:8080/trip/accept/1",
+											"protocol": "http",
+											"host": [
+												"localhost"
+											],
+											"port": "8080",
+											"path": [
+												"trip",
+												"accept",
+												"1"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "reject trip",
+									"request": {
+										"method": "PUT",
+										"header": [],
+										"url": {
+											"raw": "http://localhost:8080/trip/reject/1",
+											"protocol": "http",
+											"host": [
+												"localhost"
+											],
+											"port": "8080",
+											"path": [
+												"trip",
+												"reject",
+												"1"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "get all trips",
+									"protocolProfileBehavior": {
+										"disableBodyPruning": true
+									},
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjozLCJlbWFpbCI6ImphbmUuc21pdGhAZXhhbXBsZS5jb20iLCJyb2xlIjoiZHJpdmVyIiwiZXhwIjoxNzYzMDk2NzYyLCJuYmYiOjE3NjMwMTAzNjIsImlhdCI6MTc2MzAxMDM2Mn0.XPm7fmRiOnHiXmamrT-Py8MoohUsu2e6IC-r2iI3AUM",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n    \"origin_lat\": 10.231,\n\t\"origin_lng\": 10.23214,\n\t\"dest_lat\" : 15.12312,\n\t\"dest_lng\": 20.4123,\n\t\"payment_method\": \"card\"\n}"
+										},
+										"url": {
+											"raw": "http://localhost:8080/trip/",
+											"protocol": "http",
+											"host": [
+												"localhost"
+											],
+											"port": "8080",
+											"path": [
+												"trip",
+												""
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "get 1 trip",
+									"protocolProfileBehavior": {
+										"disableBodyPruning": true
+									},
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjozLCJlbWFpbCI6ImphbmUuc21pdGhAZXhhbXBsZS5jb20iLCJyb2xlIjoiZHJpdmVyIiwiZXhwIjoxNzYzMDk2NzYyLCJuYmYiOjE3NjMwMTAzNjIsImlhdCI6MTc2MzAxMDM2Mn0.XPm7fmRiOnHiXmamrT-Py8MoohUsu2e6IC-r2iI3AUM",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n    \"origin_lat\": 10.231,\n\t\"origin_lng\": 10.23214,\n\t\"dest_lat\" : 15.12312,\n\t\"dest_lng\": 20.4123,\n\t\"payment_method\": \"card\"\n}"
+										},
+										"url": {
+											"raw": "http://localhost:8080/trip/{tripId}",
+											"protocol": "http",
+											"host": [
+												"localhost"
+											],
+											"port": "8080",
+											"path": [
+												"trip",
+												"{tripId}"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "get trips by a driver",
+									"protocolProfileBehavior": {
+										"disableBodyPruning": true
+									},
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjozLCJlbWFpbCI6ImphbmUuc21pdGhAZXhhbXBsZS5jb20iLCJyb2xlIjoiZHJpdmVyIiwiZXhwIjoxNzYzMDk2NzYyLCJuYmYiOjE3NjMwMTAzNjIsImlhdCI6MTc2MzAxMDM2Mn0.XPm7fmRiOnHiXmamrT-Py8MoohUsu2e6IC-r2iI3AUM",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n    \"origin_lat\": 10.231,\n\t\"origin_lng\": 10.23214,\n\t\"dest_lat\" : 15.12312,\n\t\"dest_lng\": 20.4123,\n\t\"payment_method\": \"card\"\n}"
+										},
+										"url": {
+											"raw": "http://localhost:8080/trip/driver",
+											"protocol": "http",
+											"host": [
+												"localhost"
+											],
+											"port": "8080",
+											"path": [
+												"trip",
+												"driver"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "get trips by user",
+									"protocolProfileBehavior": {
+										"disableBodyPruning": true
+									},
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjozLCJlbWFpbCI6ImphbmUuc21pdGhAZXhhbXBsZS5jb20iLCJyb2xlIjoiZHJpdmVyIiwiZXhwIjoxNzYzMDk2NzYyLCJuYmYiOjE3NjMwMTAzNjIsImlhdCI6MTc2MzAxMDM2Mn0.XPm7fmRiOnHiXmamrT-Py8MoohUsu2e6IC-r2iI3AUM",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n    \"origin_lat\": 10.231,\n\t\"origin_lng\": 10.23214,\n\t\"dest_lat\" : 15.12312,\n\t\"dest_lng\": 20.4123,\n\t\"payment_method\": \"card\"\n}"
+										},
+										"url": {
+											"raw": "http://localhost:8080/trip/user",
+											"protocol": "http",
+											"host": [
+												"localhost"
+											],
+											"port": "8080",
+											"path": [
+												"trip",
+												"user"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "get suggested driver",
+									"protocolProfileBehavior": {
+										"disableBodyPruning": true
+									},
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjozLCJlbWFpbCI6ImphbmUuc21pdGhAZXhhbXBsZS5jb20iLCJyb2xlIjoiZHJpdmVyIiwiZXhwIjoxNzYzMDk2NzYyLCJuYmYiOjE3NjMwMTAzNjIsImlhdCI6MTc2MzAxMDM2Mn0.XPm7fmRiOnHiXmamrT-Py8MoohUsu2e6IC-r2iI3AUM",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n    \"origin_lat\": 10.231,\n\t\"origin_lng\": 10.23214,\n\t\"dest_lat\" : 15.12312,\n\t\"dest_lng\": 20.4123,\n\t\"payment_method\": \"card\"\n}"
+										},
+										"url": {
+											"raw": "http://localhost:8080/trip/suggested/{tripId}",
+											"protocol": "http",
+											"host": [
+												"localhost"
+											],
+											"port": "8080",
+											"path": [
+												"trip",
+												"suggested",
+												"{tripId}"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "cancel trip",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjozLCJlbWFpbCI6ImphbmUuc21pdGhAZXhhbXBsZS5jb20iLCJyb2xlIjoiZHJpdmVyIiwiZXhwIjoxNzYzMDk2NzYyLCJuYmYiOjE3NjMwMTAzNjIsImlhdCI6MTc2MzAxMDM2Mn0.XPm7fmRiOnHiXmamrT-Py8MoohUsu2e6IC-r2iI3AUM",
+													"type": "string"
+												}
+											]
+										},
+										"method": "PUT",
+										"header": [],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n    \"origin_lat\": 10.231,\n\t\"origin_lng\": 10.23214,\n\t\"dest_lat\" : 15.12312,\n\t\"dest_lng\": 20.4123,\n\t\"payment_method\": \"card\"\n}"
+										},
+										"url": {
+											"raw": "http://localhost:8080/trip/cancel/{tripID}",
+											"protocol": "http",
+											"host": [
+												"localhost"
+											],
+											"port": "8080",
+											"path": [
+												"trip",
+												"cancel",
+												"{tripID}"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "change trip status",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjozLCJlbWFpbCI6ImphbmUuc21pdGhAZXhhbXBsZS5jb20iLCJyb2xlIjoiZHJpdmVyIiwiZXhwIjoxNzYzMDk2NzYyLCJuYmYiOjE3NjMwMTAzNjIsImlhdCI6MTc2MzAxMDM2Mn0.XPm7fmRiOnHiXmamrT-Py8MoohUsu2e6IC-r2iI3AUM",
+													"type": "string"
+												}
+											]
+										},
+										"method": "PUT",
+										"header": [],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n    \"status\": \"COMPLETED\"\n}"
+										},
+										"url": {
+											"raw": "http://localhost:8080/trip/status/{tripId}",
+											"protocol": "http",
+											"host": [
+												"localhost"
+											],
+											"port": "8080",
+											"path": [
+												"trip",
+												"status",
+												"{tripId}"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "add review",
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjozLCJlbWFpbCI6ImphbmUuc21pdGhAZXhhbXBsZS5jb20iLCJyb2xlIjoiZHJpdmVyIiwiZXhwIjoxNzYzMDk2NzYyLCJuYmYiOjE3NjMwMTAzNjIsImlhdCI6MTc2MzAxMDM2Mn0.XPm7fmRiOnHiXmamrT-Py8MoohUsu2e6IC-r2iI3AUM",
+													"type": "string"
+												}
+											]
+										},
+										"method": "PUT",
+										"header": [],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n    \"rating\": 5,\n    \"comment\": \"ok, gud\"\n}"
+										},
+										"url": {
+											"raw": "http://localhost:8080/trip/review/{tripId}",
+											"protocol": "http",
+											"host": [
+												"localhost"
+											],
+											"port": "8080",
+											"path": [
+												"trip",
+												"review",
+												"{tripId}"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "get trip's review",
+									"protocolProfileBehavior": {
+										"disableBodyPruning": true
+									},
+									"request": {
+										"auth": {
+											"type": "bearer",
+											"bearer": [
+												{
+													"key": "token",
+													"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjozLCJlbWFpbCI6ImphbmUuc21pdGhAZXhhbXBsZS5jb20iLCJyb2xlIjoiZHJpdmVyIiwiZXhwIjoxNzYzMDk2NzYyLCJuYmYiOjE3NjMwMTAzNjIsImlhdCI6MTc2MzAxMDM2Mn0.XPm7fmRiOnHiXmamrT-Py8MoohUsu2e6IC-r2iI3AUM",
+													"type": "string"
+												}
+											]
+										},
+										"method": "GET",
+										"header": [],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n    \"origin_lat\": 10.231,\n\t\"origin_lng\": 10.23214,\n\t\"dest_lat\" : 15.12312,\n\t\"dest_lng\": 20.4123,\n\t\"payment_method\": \"card\"\n}"
+										},
+										"url": {
+											"raw": "http://localhost:8080/trip/review/{tripId}",
+											"protocol": "http",
+											"host": [
+												"localhost"
+											],
+											"port": "8080",
+											"path": [
+												"trip",
+												"review",
+												"{tripId}"
+											]
+										}
+									},
+									"response": []
+								}
+							]
+						}
+					]
+				}
+			]
+		}
+	]
 }
