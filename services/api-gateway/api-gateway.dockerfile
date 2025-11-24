@@ -13,7 +13,7 @@ COPY proto /app/proto
 COPY common /app/common
 
 # Get build dependencies first
-COPY $service/go.mod $service/go.sum /app/$service
+COPY $service/go.mod $service/go.sum /app/$service/
 
 WORKDIR /app/${service}
 
