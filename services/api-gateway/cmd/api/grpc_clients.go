@@ -83,6 +83,31 @@ func InitGRPCClients() (*GRPCClients, error) {
 	}, nil
 }
 
+// RegisterViaGRPC registers a new user via gRPC
+func (app *Config) RegisterViaGRPC(ctx context.Context, email, password, firstName, lastName string) (*authpb.RegisterResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	req := &authpb.RegisterRequest{
+		Email:     email,
+		Password:  password,
+		FirstName: firstName,
+		LastName:  lastName,
+	}
+
+	logger.Info("Calling authentication service Register via gRPC",
+		zap.String("email", email),
+	)
+
+	resp, err := app.GRPCClients.AuthClient.Register(ctx, req)
+	if err != nil {
+		logger.Error("gRPC Register failed", zap.Error(err))
+		return nil, err
+	}
+
+	return resp, nil
+}
+
 // AuthenticateViaGRPC authenticates a user via gRPC
 func (app *Config) AuthenticateViaGRPC(ctx context.Context, email, password string) (*authpb.AuthResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)

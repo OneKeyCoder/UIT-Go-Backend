@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net"
 
+	"authentication-service/data"
+
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/grpcutil"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/jwt"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/logger"
@@ -19,6 +21,59 @@ import (
 type AuthServer struct {
 	pb.UnimplementedAuthServiceServer
 	Config *Config
+}
+
+// Authenticate handles user authentication
+func (s *AuthServer) Register(ctx context.Context, req *pb.RegisterRequest) (*pb.RegisterResponse, error) {
+	logger.Info("gRPC register request",
+		zap.String("email", req.Email),
+	)
+
+	// Check if user already exists
+	existingUser, _ := s.Config.Models.User.GetByEmail(req.Email)
+	if existingUser != nil {
+		return nil, status.Error(codes.AlreadyExists, "User with this email already exists")
+	}
+
+	// Create new user
+	newUser := data.User{
+		Email:     req.Email,
+		FirstName: req.FirstName,
+		LastName:  req.LastName,
+		Password:  req.Password, // Will be hashed by Insert()
+		Active:    1,
+		Role:      "user",
+	}
+
+	userID, err := s.Config.Models.User.Insert(newUser)
+	if err != nil {
+		logger.Error("Failed to create user", zap.Error(err))
+		return nil, status.Error(codes.Internal, "Failed to create user")
+	}
+
+	// Get the created user
+	user, err := s.Config.Models.User.GetOne(userID)
+	if err != nil {
+		logger.Error("Failed to get created user", zap.Error(err))
+		return nil, status.Error(codes.Internal, "User created but failed to retrieve")
+	}
+
+	logger.Info("User registered successfully (gRPC)",
+		zap.String("email", user.Email),
+		zap.Int("user_id", user.ID),
+	)
+
+	return &pb.RegisterResponse{
+		Success: true,
+		Message: "User registered successfully",
+		User: &pb.User{
+			Id:        int32(user.ID),
+			Email:     user.Email,
+			FirstName: user.FirstName,
+			LastName:  user.LastName,
+			Active:    int32(user.Active),
+		},
+	}, nil
 }
 
 // Authenticate handles user authentication

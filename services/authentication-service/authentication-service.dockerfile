@@ -13,14 +13,14 @@ COPY proto /app/proto
 COPY common /app/common
 
 # Get build dependencies first
-COPY $service/go.mod $service/go.sum /app/$service
+COPY $service/go.mod $service/go.sum /app/$service/
 
 WORKDIR /app/${service}
 
 RUN go mod download
 
 # Copy the rest of the service
-COPY $service /app/$service
+COPY $service/ .
 
 RUN CGO_ENABLED=0 go build -o $binary ./cmd/api
 

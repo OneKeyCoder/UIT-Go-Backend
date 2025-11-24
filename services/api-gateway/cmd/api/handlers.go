@@ -12,6 +12,13 @@ import (
 	"go.uber.org/zap"
 )
 
+type RegisterPayload struct {
+	Email     string `json:"email" validate:"required,email"`
+	Password  string `json:"password" validate:"required,min=6"`
+	FirstName string `json:"first_name" validate:"required,min=2"`
+	LastName  string `json:"last_name" validate:"required,min=2"`
+}
+
 type AuthPayload struct {
 	Email    string `json:"email" validate:"required,email"`
 	Password string `json:"password" validate:"required,min=6"`
@@ -51,6 +58,37 @@ type ReviewRequest struct {
 
 func (app *Config) Broker(w http.ResponseWriter, r *http.Request) {
 	response.Success(w, "Hit the broker", nil)
+}
+
+// authenticateViaGRPC handles authentication using gRPC client
+func (app *Config) registerViaGRPC(w http.ResponseWriter, r *http.Request, reg RegisterPayload) {
+	ctx, span := telemetry.StartSpan(r.Context(), "registerViaGRPC")
+	defer span.End()
+
+	resp, err := app.RegisterViaGRPC(ctx, reg.Email, reg.Password, reg.FirstName, reg.LastName)
+	if err != nil {
+		response.InternalServerError(w, "Registration failed")
+		return
+	}
+
+	if !resp.Success {
+		response.BadRequest(w, resp.Message)
+		return
+	}
+
+	// Return user data
+	payload := map[string]interface{}{
+		"message": resp.Message,
+		"user": map[string]interface{}{
+			"id":         resp.User.Id,
+			"email":      resp.User.Email,
+			"first_name": resp.User.FirstName,
+			"last_name":  resp.User.LastName,
+			"active":     resp.User.Active,
+		},
+	}
+
+	response.Success(w, "User registered successfully", payload)
 }
 
 // authenticateViaGRPC handles authentication using gRPC client
