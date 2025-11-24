@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"time"
 
 	"authentication-service/data"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/jwt"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/logger"
 	pb "github.com/OneKeyCoder/UIT-Go-Backend/proto/auth"
+	userpb "github.com/OneKeyCoder/UIT-Go-Backend/proto/user"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -49,6 +51,25 @@ func (s *AuthServer) Register(ctx context.Context, req *pb.RegisterRequest) (*pb
 	if err != nil {
 		logger.Error("Failed to create user", zap.Error(err))
 		return nil, status.Error(codes.Internal, "Failed to create user")
+	}
+
+	// Create user in user-service via gRPC
+	if s.Config.UserClient != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		_, err = s.Config.UserClient.CreateUser(ctx, &userpb.CreateUserRequest{
+			Email:     req.Email,
+			FirstName: req.FirstName,
+			LastName:  req.LastName,
+		})
+		if err != nil {
+			logger.Warn("Failed to create user in user-service",
+				zap.String("email", req.Email),
+				zap.Error(err),
+			)
+			// Don't fail registration if user-service is down
+		}
 	}
 
 	// Get the created user

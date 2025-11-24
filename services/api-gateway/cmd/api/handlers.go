@@ -664,3 +664,296 @@ func (app *Config) GetTripReview(w http.ResponseWriter, r *http.Request) {
 	}
 	response.Success(w, "Trip review retrieved successfully", resp)
 }
+
+// ============================================
+// User Handlers (THIS IS GEN RAW DOG BY AI, DONT ASK ME, ASK AI)
+// ============================================
+
+func (app *Config) GetAllUsers(w http.ResponseWriter, r *http.Request) {
+	ctx, span := telemetry.StartSpan(r.Context(), "GetAllUsers")
+	defer span.End()
+
+	resp, err := app.GetAllUsersViaGRPC(ctx)
+	if err != nil || !resp.Success {
+		response.InternalServerError(w, "Failed to get all users")
+		return
+	}
+
+	response.Success(w, resp.Message, map[string]interface{}{
+		"users":       resp.Users,
+		"total_count": resp.TotalCount,
+	})
+}
+
+func (app *Config) GetUserById(w http.ResponseWriter, r *http.Request) {
+	ctx, span := telemetry.StartSpan(r.Context(), "GetUserById")
+	defer span.End()
+
+	userID := chi.URLParam(r, "id")
+	if userID == "" {
+		response.BadRequest(w, "User ID is required")
+		return
+	}
+
+	userIDInt, err := strconv.Atoi(userID)
+	if err != nil {
+		response.BadRequest(w, "User ID must be an integer")
+		return
+	}
+
+	resp, err := app.GetUserByIdViaGRPC(ctx, userIDInt)
+	if err != nil || !resp.Success {
+		response.InternalServerError(w, "Failed to get user")
+		return
+	}
+
+	response.Success(w, resp.Message, resp.User)
+}
+
+type CreateUserRequest struct {
+	Email string `json:"email" validate:"required,email"`
+}
+
+func (app *Config) CreateUser(w http.ResponseWriter, r *http.Request) {
+	ctx, span := telemetry.StartSpan(r.Context(), "CreateUser")
+	defer span.End()
+
+	var req CreateUserRequest
+	err := request.ReadAndValidate(w, r, &req)
+	if request.HandleError(w, err) {
+		return
+	}
+
+	resp, err := app.CreateUserViaGRPC(ctx, req.Email)
+	if err != nil || !resp.Success {
+		response.InternalServerError(w, "Failed to create user")
+		return
+	}
+
+	response.Success(w, resp.Message, nil)
+}
+
+type UpdateUserRequest struct {
+	Email        string `json:"email,omitempty"`
+	Role         string `json:"role,omitempty"`
+	DriverStatus string `json:"driver_status,omitempty"`
+}
+
+func (app *Config) UpdateUser(w http.ResponseWriter, r *http.Request) {
+	ctx, span := telemetry.StartSpan(r.Context(), "UpdateUser")
+	defer span.End()
+
+	userID := chi.URLParam(r, "id")
+	if userID == "" {
+		response.BadRequest(w, "User ID is required")
+		return
+	}
+
+	userIDInt, err := strconv.Atoi(userID)
+	if err != nil {
+		response.BadRequest(w, "User ID must be an integer")
+		return
+	}
+
+	var req UpdateUserRequest
+	err = request.ReadAndValidate(w, r, &req)
+	if request.HandleError(w, err) {
+		return
+	}
+
+	resp, err := app.UpdateUserViaGRPC(ctx, userIDInt, req.Email, req.Role, req.DriverStatus)
+	if err != nil || !resp.Success {
+		response.InternalServerError(w, "Failed to update user")
+		return
+	}
+
+	response.Success(w, resp.Message, nil)
+}
+
+func (app *Config) DeleteUser(w http.ResponseWriter, r *http.Request) {
+	ctx, span := telemetry.StartSpan(r.Context(), "DeleteUser")
+	defer span.End()
+
+	userID := chi.URLParam(r, "id")
+	if userID == "" {
+		response.BadRequest(w, "User ID is required")
+		return
+	}
+
+	userIDInt, err := strconv.Atoi(userID)
+	if err != nil {
+		response.BadRequest(w, "User ID must be an integer")
+		return
+	}
+
+	resp, err := app.DeleteUserViaGRPC(ctx, userIDInt)
+	if err != nil || !resp.Success {
+		response.InternalServerError(w, "Failed to delete user")
+		return
+	}
+
+	response.Success(w, resp.Message, nil)
+}
+
+// ============================================
+// Vehicle Handlers
+// ============================================
+
+func (app *Config) GetAllVehicles(w http.ResponseWriter, r *http.Request) {
+	ctx, span := telemetry.StartSpan(r.Context(), "GetAllVehicles")
+	defer span.End()
+
+	resp, err := app.GetAllVehiclesViaGRPC(ctx)
+	if err != nil || !resp.Success {
+		response.InternalServerError(w, "Failed to get all vehicles")
+		return
+	}
+
+	response.Success(w, resp.Message, map[string]interface{}{
+		"vehicles":    resp.Vehicles,
+		"total_count": resp.TotalCount,
+	})
+}
+
+func (app *Config) GetVehicleById(w http.ResponseWriter, r *http.Request) {
+	ctx, span := telemetry.StartSpan(r.Context(), "GetVehicleById")
+	defer span.End()
+
+	vehicleID := chi.URLParam(r, "id")
+	if vehicleID == "" {
+		response.BadRequest(w, "Vehicle ID is required")
+		return
+	}
+
+	vehicleIDInt, err := strconv.Atoi(vehicleID)
+	if err != nil {
+		response.BadRequest(w, "Vehicle ID must be an integer")
+		return
+	}
+
+	resp, err := app.GetVehicleByIdViaGRPC(ctx, vehicleIDInt)
+	if err != nil || !resp.Success {
+		response.InternalServerError(w, "Failed to get vehicle")
+		return
+	}
+
+	response.Success(w, resp.Message, resp.Vehicle)
+}
+
+func (app *Config) GetVehiclesByUserId(w http.ResponseWriter, r *http.Request) {
+	ctx, span := telemetry.StartSpan(r.Context(), "GetVehiclesByUserId")
+	defer span.End()
+
+	userID := chi.URLParam(r, "id")
+	if userID == "" {
+		response.BadRequest(w, "User ID is required")
+		return
+	}
+
+	userIDInt, err := strconv.Atoi(userID)
+	if err != nil {
+		response.BadRequest(w, "User ID must be an integer")
+		return
+	}
+
+	resp, err := app.GetVehiclesByUserIdViaGRPC(ctx, userIDInt)
+	if err != nil || !resp.Success {
+		response.InternalServerError(w, "Failed to get vehicles")
+		return
+	}
+
+	response.Success(w, resp.Message, map[string]interface{}{
+		"vehicles":    resp.Vehicles,
+		"total_count": resp.TotalCount,
+	})
+}
+
+type CreateVehicleRequest struct {
+	DriverId     int    `json:"driver_id" validate:"required"`
+	LicensePlate string `json:"license_plate" validate:"required"`
+	VehicleType  string `json:"vehicle_type" validate:"required"`
+	Seats        int    `json:"seats" validate:"required,min=1"`
+	Status       string `json:"status" validate:"required"`
+}
+
+func (app *Config) CreateVehicle(w http.ResponseWriter, r *http.Request) {
+	ctx, span := telemetry.StartSpan(r.Context(), "CreateVehicle")
+	defer span.End()
+
+	var req CreateVehicleRequest
+	err := request.ReadAndValidate(w, r, &req)
+	if request.HandleError(w, err) {
+		return
+	}
+
+	resp, err := app.CreateVehicleViaGRPC(ctx, req.DriverId, req.LicensePlate, req.VehicleType, req.Seats, req.Status)
+	if err != nil || !resp.Success {
+		response.InternalServerError(w, "Failed to create vehicle")
+		return
+	}
+
+	response.Success(w, resp.Message, resp.Vehicle)
+}
+
+type UpdateVehicleRequest struct {
+	LicensePlate string `json:"license_plate,omitempty"`
+	VehicleType  string `json:"vehicle_type,omitempty"`
+	Seats        int    `json:"seats,omitempty"`
+	Status       string `json:"status,omitempty"`
+}
+
+func (app *Config) UpdateVehicle(w http.ResponseWriter, r *http.Request) {
+	ctx, span := telemetry.StartSpan(r.Context(), "UpdateVehicle")
+	defer span.End()
+
+	vehicleID := chi.URLParam(r, "id")
+	if vehicleID == "" {
+		response.BadRequest(w, "Vehicle ID is required")
+		return
+	}
+
+	vehicleIDInt, err := strconv.Atoi(vehicleID)
+	if err != nil {
+		response.BadRequest(w, "Vehicle ID must be an integer")
+		return
+	}
+
+	var req UpdateVehicleRequest
+	err = request.ReadAndValidate(w, r, &req)
+	if request.HandleError(w, err) {
+		return
+	}
+
+	resp, err := app.UpdateVehicleViaGRPC(ctx, vehicleIDInt, req.LicensePlate, req.VehicleType, req.Seats, req.Status)
+	if err != nil || !resp.Success {
+		response.InternalServerError(w, "Failed to update vehicle")
+		return
+	}
+
+	response.Success(w, resp.Message, resp.Vehicle)
+}
+
+func (app *Config) DeleteVehicle(w http.ResponseWriter, r *http.Request) {
+	ctx, span := telemetry.StartSpan(r.Context(), "DeleteVehicle")
+	defer span.End()
+
+	vehicleID := chi.URLParam(r, "id")
+	if vehicleID == "" {
+		response.BadRequest(w, "Vehicle ID is required")
+		return
+	}
+
+	vehicleIDInt, err := strconv.Atoi(vehicleID)
+	if err != nil {
+		response.BadRequest(w, "Vehicle ID must be an integer")
+		return
+	}
+
+	resp, err := app.DeleteVehicleViaGRPC(ctx, vehicleIDInt)
+	if err != nil || !resp.Success {
+		response.InternalServerError(w, "Failed to delete vehicle")
+		return
+	}
+
+	response.Success(w, resp.Message, nil)
+}

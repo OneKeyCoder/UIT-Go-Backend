@@ -108,5 +108,26 @@ func (app *Config) routes() http.Handler {
 		r.Put("/review/{tripID}", app.SubmitReview)
 		r.Get("/review/{tripID}", app.GetTripReview)
 	})
+
+	// User and Vehicle routes
+	mux.Route("/users", func(r chi.Router) {
+		r.Use(app.AuthRequired)
+		r.Get("/", app.GetAllUsers)
+		r.Get("/{id}", app.GetUserById)
+		r.Post("/", app.CreateUser)
+		r.Put("/{id}", app.UpdateUser)
+		r.Delete("/{id}", app.DeleteUser)
+		r.Get("/{id}/vehicles", app.GetVehiclesByUserId)
+	})
+
+	mux.Route("/vehicles", func(r chi.Router) {
+		r.Use(app.AuthRequired)
+		r.Get("/", app.GetAllVehicles)
+		r.Get("/{id}", app.GetVehicleById)
+		r.Post("/", app.CreateVehicle)
+		r.Put("/{id}", app.UpdateVehicle)
+		r.Delete("/{id}", app.DeleteVehicle)
+	})
+
 	return mux
 }
