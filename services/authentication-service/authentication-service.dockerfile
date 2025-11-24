@@ -12,14 +12,17 @@ WORKDIR /app
 COPY proto /app/proto
 COPY common /app/common
 
-COPY $service /app/$service
+# Get build dependencies first
+COPY $service/go.mod $service/go.sum /app/$service
 
 WORKDIR /app/${service}
 
 RUN go mod download
 
-# Build the application
-RUN CGO_ENABLED=0 go build -a -installsuffix cgo -o $binary ./cmd/api
+# Copy the rest of the service
+COPY $service /app/$service
+
+RUN CGO_ENABLED=0 go build -o $binary ./cmd/api
 
 # Runtime stage
 FROM alpine:latest
