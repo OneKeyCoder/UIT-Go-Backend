@@ -50,7 +50,14 @@ services:
       jaeger:
         condition: service_started
     environment:
-      MONGO_URL: "mongodb://admin:password@mongo:27017"
+      MONGO_URL: "mongodb://mongo:27017"
+      MONGO_USERNAME: "admin"
+      MONGO_PASSWORD: "password"
+      RABBITMQ_HOST: "rabbitmq"
+      RABBITMQ_PORT: "5672"
+      RABBITMQ_USER: "guest"
+      RABBITMQ_PASSWORD: "guest"
+      RABBITMQ_VHOST: "/"
       OTEL_EXPORTER: "otlp"
       OTEL_COLLECTOR_ENDPOINT: "jaeger:4317"
 
@@ -75,6 +82,11 @@ services:
       JWT_SECRET: "your-secret-key-change-in-production"
       JWT_EXPIRY: "24h"
       REFRESH_TOKEN_EXPIRY: "168h"
+      RABBITMQ_HOST: "rabbitmq"
+      RABBITMQ_PORT: "5672"
+      RABBITMQ_USER: "guest"
+      RABBITMQ_PASSWORD: "guest"
+      RABBITMQ_VHOST: "/"
       OTEL_EXPORTER: "otlp"
       OTEL_COLLECTOR_ENDPOINT: "jaeger:4317"
 
@@ -219,5 +231,10 @@ services:
       DSN: "host=postgres port=5432 user=postgres password=password dbname=trips sslmode=disable timezone=UTC connect_timeout=5"
       HERE_ID: ${HERE_ID}
       HERE_SECRET: ${HERE_SECRET}
+      RABBITMQ_HOST: "rabbitmq"
+      RABBITMQ_PORT: "5672"
+      RABBITMQ_USER: "guest"
+      RABBITMQ_PASSWORD: "guest"
+      RABBITMQ_VHOST: "/"
       OTEL_EXPORTER: "otlp"
       OTEL_COLLECTOR_ENDPOINT: "jaeger:4317"

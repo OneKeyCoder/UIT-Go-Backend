@@ -4,21 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"strconv"
 	"time"
 
+	"github.com/OneKeyCoder/UIT-Go-Backend/common/env"
 	"github.com/redis/go-redis/v9"
 )
 
-func getEnv(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
-}
-
-var TIMETOLIVE = getEnv("REDIS_TIME_TO_LIVE", "3600")
+var TIMETOLIVE = env.Get("REDIS_TIME_TO_LIVE", "3600")
 
 type LocationService struct {
 	redisClient *redis.Client
