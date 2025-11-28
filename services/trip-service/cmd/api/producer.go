@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/Azure/go-amqp"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/logger"
-	amqp "github.com/rabbitmq/amqp091-go"
 	"go.uber.org/zap"
 )
 
@@ -15,28 +15,25 @@ type EventMessage struct {
 	Data string `json:"data"`
 }
 
-func PublishEvent(conn *amqp.Connection, eventName, eventData string) error {
-	ch, err := conn.Channel()
-	if err != nil {
-		logger.Error("Failed to open RabbitMQ channel", zap.Error(err))
-		return err
-	}
-	defer ch.Close()
+func PublishEvent(conn *amqp.Conn, eventName, eventData string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	// Declare exchange
-	err = ch.ExchangeDeclare(
-		"logs_topic", // name
-		"topic",      // type
-		true,         // durable
-		false,        // auto-deleted
-		false,        // internal
-		false,        // no-wait
-		nil,          // arguments
-	)
+	// Create a new session for this publish operation
+	session, err := conn.NewSession(ctx, nil)
 	if err != nil {
-		logger.Error("Failed to declare exchange", zap.Error(err))
+		logger.Error("Failed to create AMQP 1.0 session", zap.Error(err))
 		return err
 	}
+	defer session.Close(ctx)
+
+	// Create a sender to the logs queue
+	sender, err := session.NewSender(ctx, "/queues/logs", nil)
+	if err != nil {
+		logger.Error("Failed to create RabbitMQ sender", zap.Error(err))
+		return err
+	}
+	defer sender.Close(ctx)
 
 	// Create event message
 	event := EventMessage{
@@ -50,22 +47,16 @@ func PublishEvent(conn *amqp.Connection, eventName, eventData string) error {
 		return err
 	}
 
-	// Publish message
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	err = ch.PublishWithContext(
-		ctx,
-		"logs_topic", // exchange
-		"log.INFO",   // routing key
-		false,        // mandatory
-		false,        // immediate
-		amqp.Publishing{
-			ContentType: "application/json",
-			Body:        body,
+	// Create message
+	msg := &amqp.Message{
+		Data: [][]byte{body},
+		Properties: &amqp.MessageProperties{
+			ContentType: to("application/json"),
 		},
-	)
+	}
 
+	// Send the message
+	err = sender.Send(ctx, msg, nil)
 	if err != nil {
 		logger.Error("Failed to publish event", zap.Error(err))
 		return err
@@ -76,4 +67,9 @@ func PublishEvent(conn *amqp.Connection, eventName, eventData string) error {
 		zap.String("data", eventData))
 
 	return nil
+}
+
+// Helper function to create string pointer
+func to(s string) *string {
+	return &s
 }
