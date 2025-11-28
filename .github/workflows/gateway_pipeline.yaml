@@ -1,0 +1,25 @@
+name: Build and Deploy API gateway to ACA 
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'services/api-gateway/**'
+      - 'services/proto/**'
+      - 'services/common/**'
+  pull_request:
+    branches: [master]
+    paths:
+      - 'services/api-gateway/**'
+      - 'services/proto/**'
+      - 'services/common/**'
+
+
+jobs:
+  deploy-to-aca:
+    uses: ./.github/workflows/template.yaml
+    with:
+      app-name: api-gateway  ## cái này cũng thay bằng tên container app real nhé
+      dockerfile-path: api-gateway/api-gateway.dockerfile
+    secrets: inherit
+  
