@@ -17,6 +17,7 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/grpcutil"
+	"github.com/OneKeyCoder/UIT-Go-Backend/common/env"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/logger"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/telemetry"
 	userpb "github.com/OneKeyCoder/UIT-Go-Backend/proto/user"
@@ -220,9 +221,10 @@ func connectToRabbitMQ() (*amqp.Connection, error) {
 	var counts int64
 	var backOff = 1 * time.Second
 	var connection *amqp.Connection
+	rabbitURL := env.RabbitMQURL()
 
 	for {
-		c, err := amqp.Dial("amqp://guest:guest@rabbitmq")
+		c, err := amqp.Dial(rabbitURL)
 		if err != nil {
 			logger.Info("RabbitMQ not yet ready...")
 			counts++

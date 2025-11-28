@@ -3,10 +3,10 @@ package configs
 import (
 	"context"
 	"fmt"
-	"os"
 	"strconv"
 	"time"
 
+	"github.com/OneKeyCoder/UIT-Go-Backend/common/env"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/logger"
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
@@ -22,28 +22,21 @@ type RedisConfig struct {
 
 var RedisClient *redis.Client
 
-func getEnv(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
-}
-
 func GetRedisConfig() *RedisConfig {
-	db, err := strconv.Atoi(getEnv("REDIS_DB", "0"))
+	db, err := strconv.Atoi(env.Get("REDIS_DB", "0"))
 	if err != nil {
 		db = 0
 	}
 
-	ttl, err := strconv.Atoi(getEnv("REDIS_TIME_TO_LIVE", "3600"))
+	ttl, err := strconv.Atoi(env.Get("REDIS_TIME_TO_LIVE", "3600"))
 	if err != nil {
 		ttl = 3600
 	}
 
 	return &RedisConfig{
-		Host:     getEnv("REDIS_HOST", "redis"),
-		Port:     getEnv("REDIS_PORT", "6379"),
-		Password: getEnv("REDIS_PASSWORD", "redispassword"),
+		Host:     env.Get("REDIS_HOST", "redis"),
+		Port:     env.Get("REDIS_PORT", "6379"),
+		Password: env.Get("REDIS_PASSWORD", "redispassword"),
 		DB:       db,
 		TTL:      ttl,
 	}

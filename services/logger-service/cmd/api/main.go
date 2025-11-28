@@ -14,6 +14,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
+	"github.com/OneKeyCoder/UIT-Go-Backend/common/env"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/logger"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/telemetry"
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -125,12 +126,16 @@ func main() {
 }
 
 func connectToMongo() (*mongo.Client, error) {
-	mongoURL := "mongodb://mongo:27017"
+	mongoURL := env.Get("MONGO_URL", "mongodb://mongo:27017")
+	username := env.Get("MONGO_USERNAME", "admin")
+	password := env.Get("MONGO_PASSWORD", "password")
 	clientOptions := options.Client().ApplyURI(mongoURL)
-	clientOptions.SetAuth(options.Credential{
-		Username: "admin",
-		Password: "password",
-	})
+	if username != "" || password != "" {
+		clientOptions.SetAuth(options.Credential{
+			Username: username,
+			Password: password,
+		})
+	}
 
 	// Connection pooling configuration
 	clientOptions.SetMaxPoolSize(50)                   // Maximum connections
@@ -151,9 +156,10 @@ func connectToRabbitMQ() (*amqp.Connection, error) {
 	var counts int64
 	var backOff = 1 * time.Second
 	var connection *amqp.Connection
+	rabbitURL := env.RabbitMQURL()
 
 	for {
-		c, err := amqp.Dial("amqp://guest:guest@rabbitmq")
+		c, err := amqp.Dial(rabbitURL)
 		if err != nil {
 			logger.Info("RabbitMQ not yet ready...")
 			counts++
