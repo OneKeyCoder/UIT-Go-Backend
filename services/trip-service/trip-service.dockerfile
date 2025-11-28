@@ -20,7 +20,7 @@ WORKDIR /app/${service}
 RUN go mod download
 
 # Copy the rest of the service
-COPY $service/ .
+COPY $service /app/$service
 
 RUN CGO_ENABLED=0 go build -o $binary ./cmd/api
 
