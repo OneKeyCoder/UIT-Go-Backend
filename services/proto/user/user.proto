@@ -1,0 +1,174 @@
+syntax = "proto3";
+
+package user;
+
+option go_package = "github.com/OneKeyCoder/UIT-Go-Backend/proto/user";
+
+// UserService provides user and vehicle management operations
+service UserService {
+  // User operations
+  rpc GetUserById(GetUserByIdRequest) returns (GetUserByIdResponse);
+  rpc GetAllUsers(GetAllUsersRequest) returns (GetAllUsersResponse);
+  rpc CreateUser(CreateUserRequest) returns (CreateUserResponse);
+  rpc UpdateUser(UpdateUserRequest) returns (UpdateUserResponse);
+  rpc DeleteUser(DeleteUserRequest) returns (DeleteUserResponse);
+  
+  // Vehicle operations
+  rpc GetVehicleById(GetVehicleByIdRequest) returns (GetVehicleByIdResponse);
+  rpc GetVehiclesByUserId(GetVehiclesByUserIdRequest) returns (GetVehiclesByUserIdResponse);
+  rpc GetAllVehicles(GetAllVehiclesRequest) returns (GetAllVehiclesResponse);
+  rpc CreateVehicle(CreateVehicleRequest) returns (CreateVehicleResponse);
+  rpc UpdateVehicle(UpdateVehicleRequest) returns (UpdateVehicleResponse);
+  rpc DeleteVehicle(DeleteVehicleRequest) returns (DeleteVehicleResponse);
+}
+
+// User represents a user in the system
+message User {
+  int32 user_id = 1;
+  string email = 2;
+  string first_name = 3;
+  string last_name = 4;
+  string role = 5;
+  string driver_status = 6;
+  int32 driver_total_trip = 7;
+  double driver_revenue = 8;
+  float driver_avg_rating = 9;
+  string driver_verified_at = 10;
+  string created_at = 11;
+  string updated_at = 12;
+}
+
+// Vehicle represents a vehicle in the system
+message Vehicle {
+  int32 vehicle_id = 1;
+  int32 driver_id = 2;
+  string license_plate = 3;
+  string vehicle_type = 4;
+  int32 seats = 5;
+  string status = 6;
+  string verified_at = 7;
+  string created_at = 8;
+  string updated_at = 9;
+}
+
+// User Request/Response Messages
+
+message GetUserByIdRequest {
+  int32 user_id = 1;
+}
+
+message GetUserByIdResponse {
+  bool success = 1;
+  string message = 2;
+  User user = 3;
+}
+
+message GetAllUsersRequest {}
+
+message GetAllUsersResponse {
+  bool success = 1;
+  string message = 2;
+  repeated User users = 3;
+  int32 total_count = 4;
+}
+
+message CreateUserRequest {
+  string email = 1;
+  string first_name = 2;
+  string last_name = 3;
+}
+
+message CreateUserResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message UpdateUserRequest {
+  int32 user_id = 1;
+  string email = 2;
+  string role = 3;
+  string driver_status = 4;
+}
+
+message UpdateUserResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message DeleteUserRequest {
+  int32 user_id = 1;
+}
+
+message DeleteUserResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// Vehicle Request/Response Messages
+
+message GetVehicleByIdRequest {
+  int32 vehicle_id = 1;
+}
+
+message GetVehicleByIdResponse {
+  bool success = 1;
+  string message = 2;
+  Vehicle vehicle = 3;
+}
+
+message GetVehiclesByUserIdRequest {
+  int32 user_id = 1;
+}
+
+message GetVehiclesByUserIdResponse {
+  bool success = 1;
+  string message = 2;
+  repeated Vehicle vehicles = 3;
+  int32 total_count = 4;
+}
+
+message GetAllVehiclesRequest {}
+
+message GetAllVehiclesResponse {
+  bool success = 1;
+  string message = 2;
+  repeated Vehicle vehicles = 3;
+  int32 total_count = 4;
+}
+
+message CreateVehicleRequest {
+  int32 driver_id = 1;
+  string license_plate = 2;
+  string vehicle_type = 3;
+  int32 seats = 4;
+  string status = 5;
+}
+
+message CreateVehicleResponse {
+  bool success = 1;
+  string message = 2;
+  Vehicle vehicle = 3;
+}
+
+message UpdateVehicleRequest {
+  int32 vehicle_id = 1;
+  string license_plate = 2;
+  string vehicle_type = 3;
+  int32 seats = 4;
+  string status = 5;
+}
+
+message UpdateVehicleResponse {
+  bool success = 1;
+  string message = 2;
+  Vehicle vehicle = 3;
+}
+
+message DeleteVehicleRequest {
+  int32 vehicle_id = 1;
+}
+
+message DeleteVehicleResponse {
+  bool success = 1;
+  string message = 2;
+}

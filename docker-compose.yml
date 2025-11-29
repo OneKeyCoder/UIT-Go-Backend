@@ -2,7 +2,6 @@
 
 volumes:
   postgres-data:
-  postgres-trip-data:
   mongo-data:
   redis-data:
   rabbitmq-data:
@@ -30,6 +29,10 @@ services:
       trip-service:
         condition: service_started
       alloy:
+        condition: service_started
+      user-service:
+        condition: service_started
+      jaeger:
         condition: service_started
     environment:
       OTEL_EXPORTER: "otlp"
@@ -81,6 +84,10 @@ services:
         condition: service_started
       alloy:
         condition: service_started
+      user-service:
+        condition: service_started
+      jaeger:
+        condition: service_started
     environment:
       DSN: "host=postgres port=5432 user=postgres password=password dbname=users sslmode=disable timezone=UTC connect_timeout=5"
       JWT_SECRET: "your-secret-key-change-in-production"
@@ -120,7 +127,7 @@ services:
       OTEL_INSECURE: "true"
 
   postgres:
-    image: "postgres:16-alpine"
+    image: "postgres:17-alpine"
     ports:
       - "5432:5432"
     expose:
@@ -153,7 +160,7 @@ services:
       start_period: 40s
 
   redis:
-    image: "redis:7-alpine"
+    image: "redis:7.2.5-alpine"
     ports:
       - "6381:6379"
     restart: unless-stopped
@@ -311,3 +318,22 @@ services:
       OTEL_EXPORTER: "otlp"
       OTEL_COLLECTOR_ENDPOINT: "alloy:4317"
       OTEL_INSECURE: "true"
+
+  user-service:
+    build:
+      context: ./services
+      dockerfile: user-service/user-service.dockerfile
+    image: user-service
+    restart: unless-stopped
+    expose:
+      - "80"
+      - "50055"
+    depends_on:
+      mongo:
+        condition: service_started
+      jaeger:
+        condition: service_started
+    environment:
+      MONGO_URL: "mongodb://admin:password@mongo:27017"
+      OTEL_EXPORTER: "otlp"
+      OTEL_COLLECTOR_ENDPOINT: "jaeger:4317"
