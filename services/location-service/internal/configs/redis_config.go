@@ -9,7 +9,6 @@ import (
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/env"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/logger"
 	"github.com/redis/go-redis/v9"
-	"go.uber.org/zap"
 )
 
 type RedisConfig struct {
@@ -59,8 +58,8 @@ func ConnectRedis() (*redis.Client, error) {
 	}
 
 	logger.Info("Successfully connected to Redis",
-		zap.String("host", config.Host),
-		zap.String("port", config.Port))
+		"host", config.Host,
+		"port", config.Port)
 	return client, nil
 }
 

@@ -6,7 +6,6 @@ import (
 
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/logger"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/telemetry"
-	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -37,10 +36,10 @@ func UnaryServerInterceptor() grpc.UnaryServerInterceptor {
 		}
 
 		logger.WithContext(ctx).Info("gRPC request",
-			zap.String("method", info.FullMethod),
-			zap.String("code", code.String()),
-			zap.Duration("duration", duration),
-			zap.Error(err),
+			"method", info.FullMethod,
+			"code", code.String(),
+			"duration", duration,
+			"error", err,
 		)
 
 		return resp, err
@@ -74,10 +73,10 @@ func UnaryClientInterceptor() grpc.UnaryClientInterceptor {
 		}
 
 		logger.WithContext(ctx).Info("gRPC client call",
-			zap.String("method", method),
-			zap.String("code", code.String()),
-			zap.Duration("duration", duration),
-			zap.Error(err),
+			"method", method,
+			"code", code.String(),
+			"duration", duration,
+			"error", err,
 		)
 
 		return err

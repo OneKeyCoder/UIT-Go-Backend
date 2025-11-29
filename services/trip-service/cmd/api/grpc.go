@@ -11,7 +11,6 @@ import (
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/grpcutil"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/logger"
 	pb "github.com/OneKeyCoder/UIT-Go-Backend/proto/trip"
-	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -23,7 +22,7 @@ type TripServer struct {
 
 func (s *TripServer) CreateTrip(ctx context.Context, req *pb.CreateTripRequest) (*pb.CreateTripResponse, error) {
 	logger.Info("Create Trip via gRPC",
-		zap.String("userID", strconv.Itoa(int(req.PassengerId))),
+		"userID", strconv.Itoa(int(req.PassengerId)),
 	)
 	newTrip := repository.NewTripDTO{
 		PassengerID:   int(req.PassengerId),
@@ -35,7 +34,7 @@ func (s *TripServer) CreateTrip(ctx context.Context, req *pb.CreateTripRequest) 
 	}
 	tripRecord, duration, err := s.Config.TripService.CreateTrip(newTrip)
 	if err != nil {
-		logger.Error("Failed to create trip via gRPC", zap.Error(err))
+		logger.Error("Failed to create trip via gRPC", "error", err)
 		return nil, err
 	}
 	var status pb.TripStatus
@@ -70,12 +69,12 @@ func (s *TripServer) CreateTrip(ctx context.Context, req *pb.CreateTripRequest) 
 
 func (s *TripServer) AcceptTrip(ctx context.Context, req *pb.AcceptTripRequest) (*pb.MessageResponse, error) {
 	logger.Info("Accept Trip via gRPC",
-		zap.String("driverID", strconv.Itoa(int(req.DriverId))),
-		zap.String("tripID", strconv.Itoa(int(req.TripId))),
+		"driverID", strconv.Itoa(int(req.DriverId)),
+		"tripID", strconv.Itoa(int(req.TripId)),
 	)
 	err := s.Config.TripService.AcceptTrip(int(req.DriverId), int(req.TripId))
 	if err != nil {
-		logger.Error("Failed to accept trip via gRPC", zap.Error(err))
+		logger.Error("Failed to accept trip via gRPC", "error", err)
 		return nil, err
 	}
 	return &pb.MessageResponse{
@@ -86,12 +85,12 @@ func (s *TripServer) AcceptTrip(ctx context.Context, req *pb.AcceptTripRequest) 
 
 func (s *TripServer) RejectTrip(ctx context.Context, req *pb.RejectTripRequest) (*pb.MessageResponse, error) {
 	logger.Info("Reject Trip via gRPC",
-		zap.String("driverID", strconv.Itoa(int(req.DriverId))),
-		zap.String("tripID", strconv.Itoa(int(req.TripId))),
+		"driverID", strconv.Itoa(int(req.DriverId)),
+		"tripID", strconv.Itoa(int(req.TripId)),
 	)
 	err := s.Config.TripService.RejectTrip(int(req.PassengerId), int(req.DriverId), int(req.TripId))
 	if err != nil {
-		logger.Error("Failed to reject trip via gRPC", zap.Error(err))
+		logger.Error("Failed to reject trip via gRPC", "error", err)
 		return nil, err
 	}
 	return &pb.MessageResponse{
@@ -102,11 +101,11 @@ func (s *TripServer) RejectTrip(ctx context.Context, req *pb.RejectTripRequest) 
 
 func (s *TripServer) GetSuggestedDriver(ctx context.Context, req *pb.TripIDRequest) (*pb.GetSuggestedDriverResponse, error) {
 	logger.Info("Get Suggested Driver via gRPC",
-		zap.String("tripID", strconv.Itoa(int(req.TripId))),
+		"tripID", strconv.Itoa(int(req.TripId)),
 	)
 	driverID, err := s.Config.TripService.GetSuggestedDriver(int(req.TripId))
 	if err != nil {
-		logger.Error("Failed to get suggested driver via gRPC", zap.Error(err))
+		logger.Error("Failed to get suggested driver via gRPC", "error", err)
 		return nil, err
 	}
 	return &pb.GetSuggestedDriverResponse{
@@ -116,12 +115,12 @@ func (s *TripServer) GetSuggestedDriver(ctx context.Context, req *pb.TripIDReque
 
 func (s *TripServer) GetTripDetail(ctx context.Context, req *pb.TripIDRequest) (*pb.GetTripDetailResponse, error) {
 	logger.Info("Get Trip via gRPC",
-		zap.String("userID", strconv.Itoa(int(req.PassengerId))),
-		zap.String("tripID", strconv.Itoa(int(req.TripId))),
+		"userID", strconv.Itoa(int(req.PassengerId)),
+		"tripID", strconv.Itoa(int(req.TripId)),
 	)
 	tripRecord, err := s.Config.TripService.GetTrip(int(req.PassengerId), int(req.TripId))
 	if err != nil {
-		logger.Error("Failed to get trip via gRPC", zap.Error(err))
+		logger.Error("Failed to get trip via gRPC", "error", err)
 		return nil, err
 	}
 	var driver int
@@ -151,11 +150,11 @@ func (s *TripServer) GetTripDetail(ctx context.Context, req *pb.TripIDRequest) (
 
 func (s *TripServer) GetTripsByPassenger(ctx context.Context, req *pb.GetTripsByUserIDRequest) (*pb.TripsResponse, error) {
 	logger.Info("Get Trips By Passenger via gRPC",
-		zap.String("passengerID", strconv.Itoa(int(req.UserId))),
+		"passengerID", strconv.Itoa(int(req.UserId)),
 	)
 	trips, err := s.Config.TripService.GetTripsByPassenger(int(req.UserId))
 	if err != nil {
-		logger.Error("Failed to get trips by passenger via gRPC", zap.Error(err))
+		logger.Error("Failed to get trips by passenger via gRPC", "error", err)
 		return nil, err
 	}
 	var pbTrips []*pb.Trip
@@ -190,11 +189,11 @@ func (s *TripServer) GetTripsByPassenger(ctx context.Context, req *pb.GetTripsBy
 
 func (s *TripServer) GetTripsByDriver(ctx context.Context, req *pb.GetTripsByUserIDRequest) (*pb.TripsResponse, error) {
 	logger.Info("Get Trips By Driver via gRPC",
-		zap.String("driverID", strconv.Itoa(int(req.UserId))),
+		"driverID", strconv.Itoa(int(req.UserId)),
 	)
 	trips, err := s.Config.TripService.GetTripsByDriver(int(req.UserId))
 	if err != nil {
-		logger.Error("Failed to get trips by driver via gRPC", zap.Error(err))
+		logger.Error("Failed to get trips by driver via gRPC", "error", err)
 		return nil, err
 	}
 	var pbTrips []*pb.Trip
@@ -229,12 +228,12 @@ func (s *TripServer) GetTripsByDriver(ctx context.Context, req *pb.GetTripsByUse
 
 func (s *TripServer) GetAllTrips(ctx context.Context, req *pb.GetAllTripsRequest) (*pb.PageResponse, error) {
 	logger.Info("Get All Trips via gRPC",
-		zap.String("page", strconv.Itoa(int(req.Page))),
-		zap.String("limit", strconv.Itoa(int(req.Limit))),
+		"page", strconv.Itoa(int(req.Page)),
+		"limit", strconv.Itoa(int(req.Limit)),
 	)
 	trips, err := s.Config.TripService.GetAllTrips(int(req.Page), int(req.Limit))
 	if err != nil {
-		logger.Error("Failed to get all trips via gRPC", zap.Error(err))
+		logger.Error("Failed to get all trips via gRPC", "error", err)
 		return nil, err
 	}
 	var pbTrips []*pb.Trip
@@ -269,20 +268,20 @@ func (s *TripServer) GetAllTrips(ctx context.Context, req *pb.GetAllTripsRequest
 
 func (s *TripServer) UpdateTripStatus(ctx context.Context, req *pb.UpdateTripStatusRequest) (*pb.MessageResponse, error) {
 	logger.Info("Update Trip Status via gRPC",
-		zap.String("tripID", strconv.Itoa(int(req.TripId))),
-		zap.String("tripStatus", req.Status.String()),
+		"tripID", strconv.Itoa(int(req.TripId)),
+		"tripStatus", req.Status.String(),
 	)
 	var status models.TripStatus
 	if v, ok := pb.TripStatus_value[req.Status.String()]; ok {
 		status = models.TripStatus(v)
 	} else {
 		err := fmt.Errorf("invalid trip status: %s", req.Status.String())
-		logger.Error("Failed to update trip status via gRPC", zap.Error(err))
+		logger.Error("Failed to update trip status via gRPC", "error", err)
 		return nil, err
 	}
 	err := s.Config.TripService.UpdateTripStatus(status, int(req.TripId), int(req.DriverId))
 	if err != nil {
-		logger.Error("Failed to update trip status via gRPC", zap.Error(err))
+		logger.Error("Failed to update trip status via gRPC", "error", err)
 		return nil, err
 	}
 	return &pb.MessageResponse{
@@ -293,11 +292,11 @@ func (s *TripServer) UpdateTripStatus(ctx context.Context, req *pb.UpdateTripSta
 
 func (s *TripServer) CancelTrip(ctx context.Context, req *pb.CancelTripRequest) (*pb.MessageResponse, error) {
 	logger.Info("Cancel Trip via gRPC",
-		zap.String("tripID", strconv.Itoa(int(req.TripId))),
+		"tripID", strconv.Itoa(int(req.TripId)),
 	)
 	err := s.Config.TripService.CancelTrip(int(req.UserId), int(req.TripId))
 	if err != nil {
-		logger.Error("Failed to cancel trip via gRPC", zap.Error(err))
+		logger.Error("Failed to cancel trip via gRPC", "error", err)
 		return nil, err
 	}
 	return &pb.MessageResponse{
@@ -307,7 +306,7 @@ func (s *TripServer) CancelTrip(ctx context.Context, req *pb.CancelTripRequest) 
 
 func (s *TripServer) ReviewTrip(ctx context.Context, req *pb.SubmitReviewRequest) (*pb.MessageResponse, error) {
 	logger.Info("Review Trip via gRPC",
-		zap.String("tripID", strconv.Itoa(int(req.TripId))),
+		"tripID", strconv.Itoa(int(req.TripId)),
 	)
 	review := repository.ReviewDTO{
 		PassengerID: int(req.UserId),
@@ -316,7 +315,7 @@ func (s *TripServer) ReviewTrip(ctx context.Context, req *pb.SubmitReviewRequest
 	}
 	err := s.Config.TripService.ReviewTrip(int(req.UserId), int(req.TripId), review)
 	if err != nil {
-		logger.Error("Failed to review trip via gRPC", zap.Error(err))
+		logger.Error("Failed to review trip via gRPC", "error", err)
 		return nil, err
 	}
 	return &pb.MessageResponse{
@@ -327,12 +326,12 @@ func (s *TripServer) ReviewTrip(ctx context.Context, req *pb.SubmitReviewRequest
 
 func (s *TripServer) GetReview(ctx context.Context, req *pb.TripIDRequest) (*pb.GetTripReviewResponse, error) {
 	logger.Info("Get Review via gRPC",
-		zap.String("userID", strconv.Itoa(int(req.PassengerId))),
-		zap.String("tripID", strconv.Itoa(int(req.TripId))),
+		"userID", strconv.Itoa(int(req.PassengerId)),
+		"tripID", strconv.Itoa(int(req.TripId)),
 	)
 	review, err := s.Config.TripService.GetReview(int(req.TripId), int(req.PassengerId))
 	if err != nil {
-		logger.Error("Failed to get review via gRPC", zap.Error(err))
+		logger.Error("Failed to get review via gRPC", "error", err)
 		return nil, err
 	}
 	return &pb.GetTripReviewResponse{
@@ -346,7 +345,7 @@ func (s *TripServer) GetReview(ctx context.Context, req *pb.TripIDRequest) (*pb.
 func (app *Config) StartGRPCServer() error {
 	lis, err := net.Listen("tcp", ":50054")
 	if err != nil {
-		logger.Error("Failed to listen for gRPC", zap.Error(err))
+		logger.Error("Failed to listen for gRPC", "error", err)
 		return err
 	}
 
@@ -360,7 +359,7 @@ func (app *Config) StartGRPCServer() error {
 
 	pb.RegisterTripServiceServer(grpcServer, tripServer)
 
-	logger.Info("gRPC server started", zap.String("port", "50054"))
+	logger.Info("gRPC server started", "port", "50054")
 
 	return grpcServer.Serve(lis)
 }

@@ -11,7 +11,6 @@ import (
 	
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/logger"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/telemetry"
-	"go.uber.org/zap"
 )
 
 const webPort = "80"
@@ -30,13 +29,13 @@ func main() {
 	// Initialize tracing
 	shutdown, err := telemetry.InitTracer("api-gateway", "1.0.0")
 	if err != nil {
-		logger.Error("Failed to initialize tracer", zap.Error(err))
+		logger.Error("Failed to initialize tracer", "error", err)
 	} else {
 		defer func() {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			if err := shutdown(ctx); err != nil {
-				logger.Error("Failed to shutdown tracer", zap.Error(err))
+				logger.Error("Failed to shutdown tracer", "error", err)
 			}
 		}()
 	}
@@ -44,7 +43,7 @@ func main() {
 	// Initialize gRPC clients
 	grpcClients, err := InitGRPCClients()
 	if err != nil {
-		logger.Fatal("Failed to initialize gRPC clients", zap.Error(err))
+		logger.Fatal("Failed to initialize gRPC clients", "error", err)
 		os.Exit(1)
 	}
 
@@ -52,7 +51,7 @@ func main() {
 		GRPCClients: grpcClients,
 	}
 
-	logger.Info("Starting HTTP server", zap.String("port", webPort))
+	logger.Info("Starting HTTP server", "port", webPort)
 
 	// define http server
 	srv := &http.Server{
@@ -63,7 +62,7 @@ func main() {
 	// Start server in goroutine
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Fatal("Server failed", zap.Error(err))
+			logger.Fatal("Server failed", "error", err)
 		}
 	}()
 
@@ -79,7 +78,7 @@ func main() {
 	defer cancel()
 
 	if err := srv.Shutdown(ctx); err != nil {
-		logger.Error("Server forced to shutdown", zap.Error(err))
+		logger.Error("Server forced to shutdown", "error", err)
 	}
 
 	logger.Info("Server exited")

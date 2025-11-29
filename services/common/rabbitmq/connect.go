@@ -7,7 +7,6 @@ import (
 
 	"github.com/Azure/go-amqp"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/logger"
-	"go.uber.org/zap"
 )
 
 // ConnectOptions configures the connection behavior
@@ -56,8 +55,8 @@ func Connect(ctx context.Context, amqpURL string, opts *ConnectOptions) (*amqp.C
 
 		if err != nil {
 			logger.Info("RabbitMQ not yet ready...",
-				zap.Int("attempt", attempt),
-				zap.Error(err))
+				"attempt", attempt,
+				"error", err)
 			lastErr = err
 
 			if attempt >= opts.MaxRetries {
@@ -65,7 +64,7 @@ func Connect(ctx context.Context, amqpURL string, opts *ConnectOptions) (*amqp.C
 			}
 
 			backOff = time.Duration(math.Pow(float64(attempt), 2)) * time.Second
-			logger.Info("Backing off...", zap.Duration("duration", backOff))
+			logger.Info("Backing off...", "duration", backOff)
 			time.Sleep(backOff)
 			continue
 		}
@@ -83,7 +82,7 @@ func Connect(ctx context.Context, amqpURL string, opts *ConnectOptions) (*amqp.C
 	if opts.EnsureQueues && opts.ManagementURL != "" {
 		if err := ensureDefaultQueues(ctx, opts); err != nil {
 			logger.Warn("Failed to ensure queues exist, they may need to be created manually",
-				zap.Error(err))
+				"error", err)
 			// Don't fail - queues might already exist or be created by another service
 		}
 	}
@@ -107,7 +106,7 @@ func ensureDefaultQueues(ctx context.Context, opts *ConnectOptions) error {
 		if err := client.EnsureQueue(ctx, q); err != nil {
 			return err
 		}
-		logger.Info("Ensured queue exists", zap.String("queue", q.Name))
+		logger.Info("Ensured queue exists", "queue", q.Name)
 	}
 
 	return nil

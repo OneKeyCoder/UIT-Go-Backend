@@ -13,7 +13,6 @@ import (
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/logger"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/request"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/response"
-	"go.uber.org/zap"
 )
 
 type AuthRequest struct {
@@ -52,8 +51,8 @@ func (app *Config) Authenticate(w http.ResponseWriter, r *http.Request) {
 	user, err := app.Models.User.GetByEmail(requestPayload.Email)
 	if err != nil {
 		logger.Warn("Failed authentication attempt",
-			zap.String("email", requestPayload.Email),
-			zap.Error(err),
+			"email", requestPayload.Email,
+			"error", err,
 		)
 		response.Unauthorized(w, "Invalid credentials")
 		return
@@ -62,7 +61,7 @@ func (app *Config) Authenticate(w http.ResponseWriter, r *http.Request) {
 	valid, err := user.PasswordMatches(requestPayload.Password)
 	if err != nil || !valid {
 		logger.Warn("Invalid password",
-			zap.String("email", requestPayload.Email),
+			"email", requestPayload.Email,
 		)
 		response.Unauthorized(w, "Invalid credentials")
 		return
@@ -79,16 +78,16 @@ func (app *Config) Authenticate(w http.ResponseWriter, r *http.Request) {
 	)
 	if err != nil {
 		logger.Error("Failed to generate tokens",
-			zap.String("email", user.Email),
-			zap.Error(err),
+			"email", user.Email,
+			"error", err,
 		)
 		response.InternalServerError(w, "Failed to generate authentication tokens")
 		return
 	}
 
 	logger.Info("User authenticated successfully",
-		zap.String("email", user.Email),
-		zap.Int("user_id", user.ID),
+		"email", user.Email,
+		"user_id", user.ID,
 	)
 
 	// Log to logger service (async via RabbitMQ would be better)
@@ -198,16 +197,16 @@ func (app *Config) Register(w http.ResponseWriter, r *http.Request) {
 	userID, err := app.Models.User.Insert(newUser)
 	if err != nil {
 		logger.Error("Failed to create user",
-			zap.String("email", requestPayload.Email),
-			zap.Error(err),
+			"email", requestPayload.Email,
+			"error", err,
 		)
 		response.InternalServerError(w, "Failed to create user account")
 		return
 	}
 
 	logger.Info("New user registered",
-		zap.String("email", requestPayload.Email),
-		zap.Int("user_id", userID),
+		"email", requestPayload.Email,
+		"user_id", userID,
 	)
 
 	// Log registration event
@@ -240,7 +239,7 @@ func (app *Config) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	user, err := app.Models.User.GetByEmail(requestPayload.Email)
 	if err != nil {
 		logger.Warn("Password change attempt for non-existent user",
-			zap.String("email", requestPayload.Email),
+			"email", requestPayload.Email,
 		)
 		response.Unauthorized(w, "Invalid credentials")
 		return
@@ -250,7 +249,7 @@ func (app *Config) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	valid, err := user.PasswordMatches(requestPayload.OldPassword)
 	if err != nil || !valid {
 		logger.Warn("Invalid old password during password change",
-			zap.String("email", requestPayload.Email),
+			"email", requestPayload.Email,
 		)
 		response.Unauthorized(w, "Invalid old password")
 		return
@@ -260,16 +259,16 @@ func (app *Config) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	err = user.ResetPassword(requestPayload.NewPassword)
 	if err != nil {
 		logger.Error("Failed to change password",
-			zap.String("email", user.Email),
-			zap.Error(err),
+			"email", user.Email,
+			"error", err,
 		)
 		response.InternalServerError(w, "Failed to change password")
 		return
 	}
 
 	logger.Info("Password changed successfully",
-		zap.String("email", user.Email),
-		zap.Int("user_id", user.ID),
+		"email", user.Email,
+		"user_id", user.ID,
 	)
 
 	// Log password change event

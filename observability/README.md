@@ -7,8 +7,9 @@ Stack observability hoàn chỉnh cho hệ thống UIT-Go ride-sharing, bao gồ
 | Pillar | Tool | Port | Mục đích |
 |--------|------|------|----------|
 | **Metrics** | Prometheus | 9090 | Thu thập và lưu trữ metrics từ các services |
-| **Logs** | Loki + Promtail | 3100 | Centralized logging với label-based indexing |
+| **Logs** | Loki + Alloy | 3100 | Centralized logging với label-based indexing |
 | **Traces** | Jaeger | 16686 | Distributed tracing qua nhiều microservices |
+| **Collector** | Grafana Alloy | 4317/4318 | OTLP collector thay thế Promtail |
 | **Visualization** | Grafana | 3000 | Dashboard, alerts, và correlation giữa 3 pillars |
 
 ## Kiến trúc
@@ -26,25 +27,39 @@ Stack observability hoàn chỉnh cho hệ thống UIT-Go ride-sharing, bao gồ
         │    (9090)       │  │    (3100)     │  │  (16686)  │
         │                 │  │               │  │           │
         │  - Metrics      │  │  - Logs       │  │  - Traces │
-        │  - Alerts       │  │  - Labels     │  │  - Spans  │
-        │  - Rules        │  │  - LogQL      │  │  - Badger │
+        │  - Remote Write │  │  - OTLP /otlp │  │  - Spans  │
+        │  - Alerts       │  │  - LogQL      │  │  - Badger │
         └────────┬────────┘  └───────┬───────┘  └─────┬─────┘
+                 ▲                   ▲                ▲
                  │                   │                │
-                 │           ┌───────▼───────┐        │
-                 │           │   Promtail    │        │
-                 │           │ (Log shipper) │        │
-                 │           └───────┬───────┘        │
-                 │                   │                │
-        ┌────────▼───────────────────▼────────────────▼────────┐
+           ┌─────┴───────────────────┴────────────────┴─────┐
+           │                 Grafana Alloy                   │
+           │              (OTLP Collector)                   │
+           │   ┌─────────────────────────────────────────┐  │
+           │   │  OTLP Receiver (4317 gRPC / 4318 HTTP)  │  │
+           │   └─────────────────────────────────────────┘  │
+           │   ┌─────────────────────────────────────────┐  │
+           │   │  Docker Log Scraper (Promtail-like)     │  │
+           │   └─────────────────────────────────────────┘  │
+           └───────────────────────┬────────────────────────┘
+                                   │
+        ┌──────────────────────────▼───────────────────────────┐
         │                    Go Services                        │
         │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐   │
         │  │ API Gateway │  │ Auth Svc    │  │ Trip Svc    │   │
-        │  │ /metrics    │  │ /metrics    │  │ /metrics    │   │
-        │  │ stdout logs │  │ stdout logs │  │ stdout logs │   │
         │  │ OTLP traces │  │ OTLP traces │  │ OTLP traces │   │
+        │  │ OTLP metrics│  │ OTLP metrics│  │ OTLP metrics│   │
+        │  │ stdout logs │  │ stdout logs │  │ stdout logs │   │
         │  └─────────────┘  └─────────────┘  └─────────────┘   │
         └──────────────────────────────────────────────────────┘
 ```
+
+## Data Flow
+
+1. **Traces**: Services → OTLP (4317) → Alloy → Jaeger
+2. **Metrics**: Services → OTLP (4317) → Alloy → Prometheus (remote write)
+3. **Logs** (Option A - OTLP): Services → OTLP (4317) → Alloy → Loki (/otlp)
+4. **Logs** (Option B - Docker): Docker stdout → Alloy → Loki (push API)
 
 ## SLOs/SLIs được định nghĩa
 

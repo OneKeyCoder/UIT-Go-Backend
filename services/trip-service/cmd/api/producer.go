@@ -7,7 +7,6 @@ import (
 
 	"github.com/Azure/go-amqp"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/logger"
-	"go.uber.org/zap"
 )
 
 type EventMessage struct {
@@ -22,7 +21,7 @@ func PublishEvent(conn *amqp.Conn, eventName, eventData string) error {
 	// Create a new session for this publish operation
 	session, err := conn.NewSession(ctx, nil)
 	if err != nil {
-		logger.Error("Failed to create AMQP 1.0 session", zap.Error(err))
+		logger.Error("Failed to create AMQP 1.0 session", "error", err)
 		return err
 	}
 	defer session.Close(ctx)
@@ -30,7 +29,7 @@ func PublishEvent(conn *amqp.Conn, eventName, eventData string) error {
 	// Create a sender to the logs queue
 	sender, err := session.NewSender(ctx, "/queues/logs", nil)
 	if err != nil {
-		logger.Error("Failed to create RabbitMQ sender", zap.Error(err))
+		logger.Error("Failed to create RabbitMQ sender", "error", err)
 		return err
 	}
 	defer sender.Close(ctx)
@@ -43,7 +42,7 @@ func PublishEvent(conn *amqp.Conn, eventName, eventData string) error {
 
 	body, err := json.Marshal(event)
 	if err != nil {
-		logger.Error("Failed to marshal event", zap.Error(err))
+		logger.Error("Failed to marshal event", "error", err)
 		return err
 	}
 
@@ -58,13 +57,13 @@ func PublishEvent(conn *amqp.Conn, eventName, eventData string) error {
 	// Send the message
 	err = sender.Send(ctx, msg, nil)
 	if err != nil {
-		logger.Error("Failed to publish event", zap.Error(err))
+		logger.Error("Failed to publish event", "error", err)
 		return err
 	}
 
 	logger.Info("Published event to RabbitMQ",
-		zap.String("name", eventName),
-		zap.String("data", eventData))
+		"name", eventName,
+		"data", eventData)
 
 	return nil
 }

@@ -2,72 +2,100 @@ package logger
 
 import (
 	"context"
+	"fmt"
+	"log/slog"
 	"os"
 
+	"go.opentelemetry.io/contrib/bridges/otelslog"
+	"go.opentelemetry.io/otel/log/global"
 	"go.opentelemetry.io/otel/trace"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
 
 var (
-	// Log is the global logger instance
-	Log *zap.Logger
-	// Sugar is the sugared logger for easier logging
-	Sugar *zap.SugaredLogger
+	// Log is the global slog logger instance
+	Log *slog.Logger
+	// serviceName stores the service name for context
+	serviceName string
 )
 
-// Init initializes the global logger
-func Init(serviceName string, isDevelopment bool) error {
-	var config zap.Config
-	
+// filteringOTLPHandler wraps OTLP handler to only send WARN and above
+// This prevents INFO logs from bloating Loki storage
+type filteringOTLPHandler struct {
+	handler slog.Handler
+}
+
+func (f *filteringOTLPHandler) Enabled(ctx context.Context, level slog.Level) bool {
+	// Only enable WARN and above for OTLP export
+	return level >= slog.LevelWarn
+}
+
+func (f *filteringOTLPHandler) Handle(ctx context.Context, r slog.Record) error {
+	return f.handler.Handle(ctx, r)
+}
+
+func (f *filteringOTLPHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	return &filteringOTLPHandler{handler: f.handler.WithAttrs(attrs)}
+}
+
+func (f *filteringOTLPHandler) WithGroup(name string) slog.Handler {
+	return &filteringOTLPHandler{handler: f.handler.WithGroup(name)}
+}
+
+// Init initializes the global logger with OTLP backend
+// Must be called AFTER telemetry.InitTracer() to use OTLP export
+func Init(service string, isDevelopment bool) error {
+	serviceName = service
+
+	// Check if OTLP LoggerProvider is available (set by telemetry.InitTracer)
+	lp := global.GetLoggerProvider()
+
+	// Create multi-handler: stdout (all levels) + OTLP (WARN+ only)
+	var handlers []slog.Handler
+
+	// Always add stdout handler for container logs visibility (all levels)
+	stdoutOpts := &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	}
 	if isDevelopment {
-		config = zap.NewDevelopmentConfig()
-		config.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
+		// Pretty text output for development
+		handlers = append(handlers, slog.NewTextHandler(os.Stdout, stdoutOpts))
 	} else {
-		config = zap.NewProductionConfig()
-		config.EncoderConfig.TimeKey = "ts"
-		config.EncoderConfig.EncodeTime = zapcore.EpochTimeEncoder
+		// JSON output for production
+		handlers = append(handlers, slog.NewJSONHandler(os.Stdout, stdoutOpts))
 	}
-	
-	// Add service name to all logs
-	config.InitialFields = map[string]interface{}{
-		"service": serviceName,
+
+	// Add OTLP handler if LoggerProvider is available (WARN+ only to reduce Loki storage)
+	if lp != nil {
+		otelHandler := otelslog.NewHandler(service, otelslog.WithLoggerProvider(lp))
+		// Wrap with filtering handler to only send WARN and above to OTLP
+		handlers = append(handlers, &filteringOTLPHandler{handler: otelHandler})
 	}
-	
-	logger, err := config.Build(
-		zap.AddCaller(),
-		zap.AddStacktrace(zapcore.ErrorLevel),
-	)
-	if err != nil {
-		return err
-	}
-	
-	Log = logger
-	Sugar = logger.Sugar()
-	
+
+	// Create multi-handler logger
+	Log = slog.New(&multiHandler{handlers: handlers}).With("service", service)
+
 	return nil
 }
 
 // InitDefault initializes with default development settings
-func InitDefault(serviceName string) {
-	if err := Init(serviceName, true); err != nil {
+func InitDefault(service string) {
+	if err := Init(service, true); err != nil {
 		// Fallback to basic logger
-		Log = zap.NewExample()
-		Sugar = Log.Sugar()
+		Log = slog.Default().With("service", service)
 	}
 }
 
-// Sync flushes any buffered log entries
+// Sync flushes any buffered log entries (no-op for slog, kept for compatibility)
 func Sync() {
-	if Log != nil {
-		_ = Log.Sync()
-	}
+	// slog doesn't need explicit sync
+	// TODO: remove this in the future if i remember it
+	// Why i do not delete it is if it work it work
 }
 
 // WithContext returns logger with trace context if available
-func WithContext(ctx context.Context) *zap.Logger {
+func WithContext(ctx context.Context) *slog.Logger {
 	if Log == nil {
-		return zap.NewNop()
+		return slog.Default()
 	}
 	
 	span := trace.SpanFromContext(ctx)
@@ -77,101 +105,141 @@ func WithContext(ctx context.Context) *zap.Logger {
 	
 	spanCtx := span.SpanContext()
 	return Log.With(
-		zap.String("trace_id", spanCtx.TraceID().String()),
-		zap.String("span_id", spanCtx.SpanID().String()),
+		"trace_id", spanCtx.TraceID().String(),
+		"span_id", spanCtx.SpanID().String(),
 	)
 }
 
 // InfoCtx logs an info message with trace context
-func InfoCtx(ctx context.Context, msg string, fields ...zap.Field) {
-	WithContext(ctx).Info(msg, fields...)
+func InfoCtx(ctx context.Context, msg string, args ...any) {
+	WithContext(ctx).InfoContext(ctx, msg, args...)
 }
 
 // ErrorCtx logs an error message with trace context
-func ErrorCtx(ctx context.Context, msg string, fields ...zap.Field) {
-	WithContext(ctx).Error(msg, fields...)
+func ErrorCtx(ctx context.Context, msg string, args ...any) {
+	WithContext(ctx).ErrorContext(ctx, msg, args...)
 }
 
 // WarnCtx logs a warning message with trace context
-func WarnCtx(ctx context.Context, msg string, fields ...zap.Field) {
-	WithContext(ctx).Warn(msg, fields...)
+func WarnCtx(ctx context.Context, msg string, args ...any) {
+	WithContext(ctx).WarnContext(ctx, msg, args...)
 }
 
 // DebugCtx logs a debug message with trace context
-func DebugCtx(ctx context.Context, msg string, fields ...zap.Field) {
-	WithContext(ctx).Debug(msg, fields...)
+func DebugCtx(ctx context.Context, msg string, args ...any) {
+	WithContext(ctx).DebugContext(ctx, msg, args...)
 }
 
 // Info logs an info message
-func Info(msg string, fields ...zap.Field) {
+func Info(msg string, args ...any) {
 	if Log != nil {
-		Log.Info(msg, fields...)
+		Log.Info(msg, args...)
 	}
 }
 
 // Error logs an error message
-func Error(msg string, fields ...zap.Field) {
+func Error(msg string, args ...any) {
 	if Log != nil {
-		Log.Error(msg, fields...)
+		Log.Error(msg, args...)
 	}
 }
 
 // Warn logs a warning message
-func Warn(msg string, fields ...zap.Field) {
+func Warn(msg string, args ...any) {
 	if Log != nil {
-		Log.Warn(msg, fields...)
+		Log.Warn(msg, args...)
 	}
 }
 
 // Debug logs a debug message
-func Debug(msg string, fields ...zap.Field) {
+func Debug(msg string, args ...any) {
 	if Log != nil {
-		Log.Debug(msg, fields...)
+		Log.Debug(msg, args...)
 	}
 }
 
 // Fatal logs a fatal message and exits
-func Fatal(msg string, fields ...zap.Field) {
+func Fatal(msg string, args ...any) {
 	if Log != nil {
-		Log.Fatal(msg, fields...)
-	} else {
-		os.Exit(1)
+		Log.Error(msg, args...)
 	}
+	os.Exit(1)
 }
 
-// Infof logs a formatted info message (sugar)
+// Infof logs a formatted info message
 func Infof(template string, args ...interface{}) {
-	if Sugar != nil {
-		Sugar.Infof(template, args...)
+	if Log != nil {
+		Log.Info(fmt.Sprintf(template, args...))
 	}
 }
 
-// Errorf logs a formatted error message (sugar)
+// Errorf logs a formatted error message
 func Errorf(template string, args ...interface{}) {
-	if Sugar != nil {
-		Sugar.Errorf(template, args...)
+	if Log != nil {
+		Log.Error(fmt.Sprintf(template, args...))
 	}
 }
 
-// Warnf logs a formatted warning message (sugar)
+// Warnf logs a formatted warning message
 func Warnf(template string, args ...interface{}) {
-	if Sugar != nil {
-		Sugar.Warnf(template, args...)
+	if Log != nil {
+		Log.Warn(fmt.Sprintf(template, args...))
 	}
 }
 
-// Debugf logs a formatted debug message (sugar)
+// Debugf logs a formatted debug message
 func Debugf(template string, args ...interface{}) {
-	if Sugar != nil {
-		Sugar.Debugf(template, args...)
+	if Log != nil {
+		Log.Debug(fmt.Sprintf(template, args...))
 	}
 }
 
-// Fatalf logs a formatted fatal message and exits (sugar)
+// Fatalf logs a formatted fatal message and exits
 func Fatalf(template string, args ...interface{}) {
-	if Sugar != nil {
-		Sugar.Fatalf(template, args...)
-	} else {
-		os.Exit(1)
+	if Log != nil {
+		Log.Error(fmt.Sprintf(template, args...))
 	}
+	os.Exit(1)
+}
+
+// multiHandler is a slog.Handler that writes to multiple handlers
+type multiHandler struct {
+	handlers []slog.Handler
+}
+
+func (m *multiHandler) Enabled(ctx context.Context, level slog.Level) bool {
+	for _, h := range m.handlers {
+		if h.Enabled(ctx, level) {
+			return true
+		}
+	}
+	return false
+}
+
+func (m *multiHandler) Handle(ctx context.Context, r slog.Record) error {
+	for _, h := range m.handlers {
+		if h.Enabled(ctx, r.Level) {
+			if err := h.Handle(ctx, r); err != nil {
+				// Continue to other handlers even if one fails
+				continue
+			}
+		}
+	}
+	return nil
+}
+
+func (m *multiHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	newHandlers := make([]slog.Handler, len(m.handlers))
+	for i, h := range m.handlers {
+		newHandlers[i] = h.WithAttrs(attrs)
+	}
+	return &multiHandler{handlers: newHandlers}
+}
+
+func (m *multiHandler) WithGroup(name string) slog.Handler {
+	newHandlers := make([]slog.Handler, len(m.handlers))
+	for i, h := range m.handlers {
+		newHandlers[i] = h.WithGroup(name)
+	}
+	return &multiHandler{handlers: newHandlers}
 }
