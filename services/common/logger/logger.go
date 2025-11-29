@@ -25,6 +25,8 @@ func Init(serviceName string, isDevelopment bool) error {
 		config.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
 	} else {
 		config = zap.NewProductionConfig()
+		config.EncoderConfig.TimeKey = "ts"
+		config.EncoderConfig.EncodeTime = zapcore.EpochTimeEncoder
 	}
 	
 	// Add service name to all logs
@@ -78,6 +80,26 @@ func WithContext(ctx context.Context) *zap.Logger {
 		zap.String("trace_id", spanCtx.TraceID().String()),
 		zap.String("span_id", spanCtx.SpanID().String()),
 	)
+}
+
+// InfoCtx logs an info message with trace context
+func InfoCtx(ctx context.Context, msg string, fields ...zap.Field) {
+	WithContext(ctx).Info(msg, fields...)
+}
+
+// ErrorCtx logs an error message with trace context
+func ErrorCtx(ctx context.Context, msg string, fields ...zap.Field) {
+	WithContext(ctx).Error(msg, fields...)
+}
+
+// WarnCtx logs a warning message with trace context
+func WarnCtx(ctx context.Context, msg string, fields ...zap.Field) {
+	WithContext(ctx).Warn(msg, fields...)
+}
+
+// DebugCtx logs a debug message with trace context
+func DebugCtx(ctx context.Context, msg string, fields ...zap.Field) {
+	WithContext(ctx).Debug(msg, fields...)
 }
 
 // Info logs an info message

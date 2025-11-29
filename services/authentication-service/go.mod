@@ -3,6 +3,7 @@ module authentication-service
 go 1.24
 
 require (
+	github.com/Azure/go-amqp v1.5.0
 	github.com/OneKeyCoder/UIT-Go-Backend/common v0.0.0
 	github.com/OneKeyCoder/UIT-Go-Backend/proto v0.0.0-20251102155041-4419ffd145b5
 	github.com/go-chi/chi/v5 v5.2.3
@@ -10,7 +11,6 @@ require (
 	github.com/jackc/pgconn v1.14.3
 	github.com/jackc/pgx/v5 v5.7.2
 	github.com/prometheus/client_golang v1.23.2
-	github.com/rabbitmq/amqp091-go v1.10.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/crypto v0.41.0
 	google.golang.org/grpc v1.75.1

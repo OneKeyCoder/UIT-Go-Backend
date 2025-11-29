@@ -5,7 +5,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"math"
 	"net/http"
 	"os"
 	"os/signal"
@@ -17,11 +16,12 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/grpcutil"
+	"github.com/Azure/go-amqp"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/env"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/logger"
+	"github.com/OneKeyCoder/UIT-Go-Backend/common/rabbitmq"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/telemetry"
-	userpb "github.com/OneKeyCoder/UIT-Go-Backend/proto/user"
-	amqp "github.com/rabbitmq/amqp091-go"
+  userpb "github.com/OneKeyCoder/UIT-Go-Backend/proto/user"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -37,8 +37,8 @@ type Config struct {
 	JWTSecret     string
 	JWTExpiry     time.Duration
 	RefreshExpiry time.Duration
-	RabbitConn    *amqp.Connection
-	UserClient    userpb.UserServiceClient
+	RabbitConn    *amqp.Conn
+  UserClient    userpb.UserServiceClient
 }
 
 func main() {
@@ -90,7 +90,7 @@ func main() {
 	}
 
 	// Connect to RabbitMQ
-	rabbitConn, err := connectToRabbitMQ()
+	rabbitConn, err := rabbitmq.ConnectSimple(env.RabbitMQURL())
 	if err != nil {
 		logger.Error("Failed to connect to RabbitMQ, continuing without events", zap.Error(err))
 	} else {
@@ -215,33 +215,4 @@ func connectToDB() *sql.DB {
 		time.Sleep(2 * time.Second)
 		continue
 	}
-}
-
-func connectToRabbitMQ() (*amqp.Connection, error) {
-	var counts int64
-	var backOff = 1 * time.Second
-	var connection *amqp.Connection
-	rabbitURL := env.RabbitMQURL()
-
-	for {
-		c, err := amqp.Dial(rabbitURL)
-		if err != nil {
-			logger.Info("RabbitMQ not yet ready...")
-			counts++
-		} else {
-			logger.Info("Connected to rabbitmq")
-			connection = c
-			break
-		}
-
-		if counts > 5 {
-			fmt.Println(err)
-			return nil, err
-		}
-		backOff = time.Duration(math.Pow(float64(counts), 2)) * time.Second
-		logger.Info("backing off...")
-		time.Sleep(backOff)
-		continue
-	}
-	return connection, nil
 }

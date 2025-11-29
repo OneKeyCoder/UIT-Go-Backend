@@ -3,6 +3,7 @@ module github.com/OneKeyCoder/UIT-Go-Backend/common
 go 1.24
 
 require (
+	github.com/Azure/go-amqp v1.5.0
 	github.com/go-chi/chi/v5 v5.2.3
 	github.com/go-playground/validator/v10 v10.24.0
 	github.com/golang-jwt/jwt/v5 v5.2.1
