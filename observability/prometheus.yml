@@ -99,7 +99,7 @@ scrape_configs:
   # Jaeger - for tracing infrastructure health
   - job_name: 'jaeger'
     static_configs:
-      - targets: ['jaeger:14269']
+      - targets: ['jaeger:8888']
     metrics_path: /metrics
 
   # Loki - for logging infrastructure health

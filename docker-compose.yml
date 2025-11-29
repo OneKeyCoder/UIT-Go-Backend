@@ -194,6 +194,7 @@ services:
     expose:
       - "4317" # OTLP gRPC receiver
       - "4318" # OTLP HTTP receiver
+      - "8888"
     restart: unless-stopped
     volumes:
       - ./observability/config-badger.yml:/etc/jaeger/config.yaml:ro
