@@ -29,7 +29,6 @@ var client *mongo.Client
 
 func main() {
 	logger.InitDefault("logger-service")
-	defer logger.Sync()
 	logger.Info("Starting logger service")
 
 	shutdown, err := telemetry.InitTracer("logger-service", "1.0.0")

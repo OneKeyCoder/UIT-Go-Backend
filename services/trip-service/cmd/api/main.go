@@ -25,7 +25,6 @@ type Config struct {
 func main() {
 	var app Config
 	logger.InitDefault("trip-service")
-	defer logger.Sync()
 	logger.Info("Starting trip service")
 	shutdown, err := telemetry.InitTracer("trip-service", "1.0.0")
 	if err != nil {

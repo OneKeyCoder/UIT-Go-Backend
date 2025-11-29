@@ -85,12 +85,6 @@ func InitDefault(service string) {
 	}
 }
 
-// Sync flushes any buffered log entries (no-op for slog, kept for compatibility)
-func Sync() {
-	// slog doesn't need explicit sync
-	// TODO: remove this in the future if i remember it
-	// Why i do not delete it is if it work it work
-}
 
 // WithContext returns logger with trace context if available
 func WithContext(ctx context.Context) *slog.Logger {

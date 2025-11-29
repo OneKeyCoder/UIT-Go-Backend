@@ -3,13 +3,13 @@
 **Status**: Proposed  
 **Date**: 2025-11-29  
 **Deciders**: UIT-Go Team  
-**Module**: D - Observability + Infrastructure  
+**Module**: D - Observability + Infrastructure
 
 ---
 
 ## Context
 
-Team đang cân nhắc các options để deploy hệ thống UIT-Go lên **Azure Container Apps (ACA)**. 
+Team đang cân nhắc các options để deploy hệ thống UIT-Go lên **Azure Container Apps (ACA)**.
 
 **Scope**: Chỉ focus vào **Production deployment**, không bàn về local development.
 
@@ -59,9 +59,10 @@ Tất cả các options đều sử dụng **OTLP (OpenTelemetry Protocol)** đ�
 ```
 
 **Backends có thể là**:
-- **Azure**: Application Insights, Log Analytics, Azure Monitor
-- **Self-hosted trên ACA**: Loki, Prometheus, Jaeger (containers)
-- **SaaS**: Grafana Cloud, Datadog, New Relic
+
+-   **Azure**: Application Insights, Log Analytics, Azure Monitor
+-   **Self-hosted trên ACA**: Loki, Prometheus, Jaeger (containers)
+-   **SaaS**: Grafana Cloud, Datadog, New Relic
 
 ---
 
@@ -126,36 +127,36 @@ Tất cả các options đều sử dụng **OTLP (OpenTelemetry Protocol)** đ�
 
 ### Đặc điểm
 
-| Aspect | Details |
-|--------|---------|
-| **Logs** | Log Analytics Workspace, query bằng KQL |
-| **Metrics** | Azure Monitor Metrics |
-| **Traces** | Application Insights Distributed Tracing |
-| **Dashboards** | Azure Workbooks (hoặc Grafana với Azure data source) |
-| **Alerts** | Azure Monitor Alerts + Action Groups |
-| **Query Language** | KQL (Kusto) - KHÔNG phải PromQL/LogQL |
+| Aspect             | Details                                              |
+| ------------------ | ---------------------------------------------------- |
+| **Logs**           | Log Analytics Workspace, query bằng KQL              |
+| **Metrics**        | Azure Monitor Metrics                                |
+| **Traces**         | Application Insights Distributed Tracing             |
+| **Dashboards**     | Azure Workbooks (hoặc Grafana với Azure data source) |
+| **Alerts**         | Azure Monitor Alerts + Action Groups                 |
+| **Query Language** | KQL (Kusto) - KHÔNG phải PromQL/LogQL                |
 
 ### Pros ✅
 
-| Pro | Explanation |
-|-----|-------------|
-| **Zero ops overhead** | Azure quản lý toàn bộ infrastructure |
-| **Auto-scaling** | Không cần lo storage, compute cho observability |
-| **Built-in AI** | Smart Detection tự động phát hiện anomalies |
-| **Deep Azure integration** | Native support cho ACA, Functions, etc. |
-| **Security** | RBAC, Private endpoints, data encryption built-in |
-| **Compliance** | SOC2, ISO 27001, HIPAA ready |
+| Pro                        | Explanation                                       |
+| -------------------------- | ------------------------------------------------- |
+| **Zero ops overhead**      | Azure quản lý toàn bộ infrastructure              |
+| **Auto-scaling**           | Không cần lo storage, compute cho observability   |
+| **Built-in AI**            | Smart Detection tự động phát hiện anomalies       |
+| **Deep Azure integration** | Native support cho ACA, Functions, etc.           |
+| **Security**               | RBAC, Private endpoints, data encryption built-in |
+| **Compliance**             | SOC2, ISO 27001, HIPAA ready                      |
 
 ### Cons ❌
 
-| Con | Explanation |
-|-----|-------------|
-| **Vendor lock-in CAO** | KQL ≠ PromQL/LogQL, không portable |
-| **Query language khác** | Phải học KQL, dashboards không reuse được |
-| **Cost unpredictable** | Tính theo GB ingested, có thể spike |
-| **Limited customization** | Không thể extend như open-source |
-| **Data sovereignty** | Data ở Azure region, có thể là issue |
-| **No Grafana native** | Phải dùng Azure Workbooks hoặc connect Grafana qua plugin |
+| Con                       | Explanation                                               |
+| ------------------------- | --------------------------------------------------------- |
+| **Vendor lock-in CAO**    | KQL ≠ PromQL/LogQL, không portable                        |
+| **Query language khác**   | Phải học KQL, dashboards không reuse được                 |
+| **Cost unpredictable**    | Tính theo GB ingested, có thể spike                       |
+| **Limited customization** | Không thể extend như open-source                          |
+| **Data sovereignty**      | Data ở Azure region, có thể là issue                      |
+| **No Grafana native**     | Phải dùng Azure Workbooks hoặc connect Grafana qua plugin |
 
 ### Những gì MẤT khi dùng Azure Native
 
@@ -302,85 +303,85 @@ Tất cả các options đều sử dụng **OTLP (OpenTelemetry Protocol)** đ�
 ```yaml
 # otel-collector-config.yaml
 receivers:
-  otlp:
-    protocols:
-      grpc:
-        endpoint: 0.0.0.0:4317
-      http:
-        endpoint: 0.0.0.0:4318
+    otlp:
+        protocols:
+            grpc:
+                endpoint: 0.0.0.0:4317
+            http:
+                endpoint: 0.0.0.0:4318
 
 processors:
-  batch:
-    timeout: 1s
-    send_batch_size: 1024
+    batch:
+        timeout: 1s
+        send_batch_size: 1024
 
 exporters:
-  # Logs → Loki
-  loki:
-    endpoint: http://loki:3100/loki/api/v1/push
-    labels:
-      attributes:
-        service.name: "service"
-        service.namespace: "namespace"
-  
-  # Metrics → Prometheus (via remote write)
-  prometheusremotewrite:
-    endpoint: http://prometheus:9090/api/v1/write
-  
-  # Traces → Jaeger
-  otlp/jaeger:
-    endpoint: jaeger:4317
-    tls:
-      insecure: true
+    # Logs → Loki
+    loki:
+        endpoint: http://loki:3100/loki/api/v1/push
+        labels:
+            attributes:
+                service.name: "service"
+                service.namespace: "namespace"
+
+    # Metrics → Prometheus (via remote write)
+    prometheusremotewrite:
+        endpoint: http://prometheus:9090/api/v1/write
+
+    # Traces → Jaeger
+    otlp/jaeger:
+        endpoint: jaeger:4317
+        tls:
+            insecure: true
 
 service:
-  pipelines:
-    logs:
-      receivers: [otlp]
-      processors: [batch]
-      exporters: [loki]
-    metrics:
-      receivers: [otlp]
-      processors: [batch]
-      exporters: [prometheusremotewrite]
-    traces:
-      receivers: [otlp]
-      processors: [batch]
-      exporters: [otlp/jaeger]
+    pipelines:
+        logs:
+            receivers: [otlp]
+            processors: [batch]
+            exporters: [loki]
+        metrics:
+            receivers: [otlp]
+            processors: [batch]
+            exporters: [prometheusremotewrite]
+        traces:
+            receivers: [otlp]
+            processors: [batch]
+            exporters: [otlp/jaeger]
 ```
 
 ### Đặc điểm
 
-| Aspect | Details |
-|--------|---------|
-| **Logs** | Loki (LogQL) |
-| **Metrics** | Prometheus (PromQL) |
-| **Traces** | Jaeger |
-| **Dashboards** | Grafana (reuse từ local!) |
-| **Alerts** | Prometheus Alertmanager |
+| Aspect             | Details                         |
+| ------------------ | ------------------------------- |
+| **Logs**           | Loki (LogQL)                    |
+| **Metrics**        | Prometheus (PromQL)             |
+| **Traces**         | Jaeger                          |
+| **Dashboards**     | Grafana (reuse từ local!)       |
+| **Alerts**         | Prometheus Alertmanager         |
 | **Query Language** | PromQL + LogQL (SAME as local!) |
 
 ### Pros ✅
 
-| Pro | Explanation |
-|-----|-------------|
-| **100% portable** | Có thể move sang AWS/GCP/on-prem |
-| **Same as local dev** | PromQL, LogQL, Grafana dashboards reuse |
-| **Community dashboards** | Thousands of ready-made dashboards |
-| **Full control** | Customize retention, sampling, etc. |
-| **Predictable cost** | Fixed cost cho containers |
-| **No vendor lock-in** | CNCF open-source stack |
+| Pro                      | Explanation                             |
+| ------------------------ | --------------------------------------- |
+| **100% portable**        | Có thể move sang AWS/GCP/on-prem        |
+| **Same as local dev**    | PromQL, LogQL, Grafana dashboards reuse |
+| **Community dashboards** | Thousands of ready-made dashboards      |
+| **Full control**         | Customize retention, sampling, etc.     |
+| **Predictable cost**     | Fixed cost cho containers               |
+| **No vendor lock-in**    | CNCF open-source stack                  |
 
 ### Cons ❌
 
-| Con | Explanation |
-|-----|-------------|
-| **Ops overhead CAO** | Phải manage 4-5 observability containers |
-| **Storage management** | Phải configure Azure Files/Disk |
-| **Scaling manual** | Loki, Prometheus không auto-scale |
-| **Higher base cost** | Containers chạy 24/7 (không scale-to-zero) |
-| **Security responsibility** | Phải tự configure TLS, auth |
-| **Updates manual** | Phải tự update Loki, Prometheus versions |
+| Con                         | Explanation                                |
+| --------------------------- | ------------------------------------------ |
+| **Ops overhead CAO**        | Phải manage 4-5 observability containers   |
+| **Storage management**      | Phải configure Azure Files/Disk            |
+| **Scaling manual**          | Loki, Prometheus không auto-scale          |
+| **Higher base cost**        | Containers chạy 24/7 (không scale-to-zero) |
+| **Security responsibility** | Phải tự configure TLS, auth                |
+| **Updates manual**          | Phải tự update Loki, Prometheus versions   |
 
 ### Những gì ĐƯỢC khi self-host
 
@@ -551,19 +552,20 @@ Azure và AWS đều có **Managed Grafana** service. Câu hỏi đặt ra: tạ
 
 ### So sánh với các Managed Grafana khác
 
-| Provider | Service | Cost | Includes Backend? |
-|----------|---------|------|-------------------|
-| **Grafana Labs** | Grafana Cloud | FREE (50GB) | ✅ Loki + Mimir + Tempo |
-| **Azure** | Azure Managed Grafana | ~$108/mo | ❌ Only UI |
-| **AWS** | Amazon Managed Grafana | ~$50-100/mo | ❌ Only UI |
-| **GCP** | (No managed Grafana) | N/A | N/A |
+| Provider         | Service                | Cost        | Includes Backend?       |
+| ---------------- | ---------------------- | ----------- | ----------------------- |
+| **Grafana Labs** | Grafana Cloud          | FREE (50GB) | ✅ Loki + Mimir + Tempo |
+| **Azure**        | Azure Managed Grafana  | ~$108/mo    | ❌ Only UI              |
+| **AWS**          | Amazon Managed Grafana | ~$50-100/mo | ❌ Only UI              |
+| **GCP**          | (No managed Grafana)   | N/A         | N/A                     |
 
 ### Tại sao Azure/AWS không bundle Loki/Prometheus?
 
-**Business reason**: 
-- Azure muốn bạn dùng Log Analytics ($2.76/GB) → revenue
-- AWS muốn bạn dùng CloudWatch → revenue
-- Nếu họ bundle Loki miễn phí → cannibalize own products
+**Business reason**:
+
+-   Azure muốn bạn dùng Log Analytics ($2.76/GB) → revenue
+-   AWS muốn bạn dùng CloudWatch → revenue
+-   Nếu họ bundle Loki miễn phí → cannibalize own products
 
 ```
 Azure's incentive:
@@ -615,18 +617,19 @@ Grafana Labs' incentive:
 
 ### Verdict: Azure Managed Grafana = Worst of Both Worlds
 
-| Aspect | Azure Managed Grafana | Grafana Cloud |
-|--------|----------------------|---------------|
-| **Cost** | $108/month (just UI) | $0 (includes backend) |
-| **Query Language** | KQL (different) | PromQL/LogQL (same) |
-| **Dashboard Reuse** | ❌ No | ✅ Yes |
-| **Vendor Lock-in** | HIGH (Azure backend) | LOW |
-| **Value** | Poor | Excellent |
+| Aspect              | Azure Managed Grafana | Grafana Cloud         |
+| ------------------- | --------------------- | --------------------- |
+| **Cost**            | $108/month (just UI)  | $0 (includes backend) |
+| **Query Language**  | KQL (different)       | PromQL/LogQL (same)   |
+| **Dashboard Reuse** | ❌ No                 | ✅ Yes                |
+| **Vendor Lock-in**  | HIGH (Azure backend)  | LOW                   |
+| **Value**           | Poor                  | Excellent             |
 
 **Kết luận**: Azure Managed Grafana là option TỆ NHẤT vì:
-- Trả $108/month chỉ cho UI
-- Vẫn phải dùng KQL (không portable)
-- Không có lợi ích gì so với Option A (Azure Native)
+
+-   Trả $108/month chỉ cho UI
+-   Vẫn phải dùng KQL (không portable)
+-   Không có lợi ích gì so với Option A (Azure Native)
 
 ---
 
@@ -635,13 +638,15 @@ Grafana Labs' incentive:
 ### Tại sao Third-party thay vì Cloud-native?
 
 Sau khi phân tích Option C (Azure Managed Grafana), ta thấy:
-- Azure Managed Grafana = **CHỈ CÓ UI** ($108/month)
-- Backend vẫn phải dùng **KQL** (không portable)
+
+-   Azure Managed Grafana = **CHỈ CÓ UI** ($108/month)
+-   Backend vẫn phải dùng **KQL** (không portable)
 
 **Grafana Cloud** (third-party) khác biệt:
-- Grafana UI + Loki + Mimir + Tempo = **FULL STACK**
-- FREE tier generous
-- **Same query language** (PromQL/LogQL) as local dev
+
+-   Grafana UI + Loki + Mimir + Tempo = **FULL STACK**
+-   FREE tier generous
+-   **Same query language** (PromQL/LogQL) as local dev
 
 ### Architecture
 
@@ -708,35 +713,35 @@ Sau khi phân tích Option C (Azure Managed Grafana), ta thấy:
 
 ### Đặc điểm
 
-| Aspect | Details |
-|--------|---------|
-| **Logs** | Grafana Loki (hosted) - LogQL ✓ |
-| **Metrics** | Grafana Mimir (hosted) - PromQL ✓ |
-| **Traces** | Grafana Tempo (hosted) - TraceQL ✓ |
-| **Dashboards** | Grafana (same as local!) |
-| **Alerts** | Grafana Alerting |
-| **Query Language** | PromQL + LogQL (SAME as local!) |
+| Aspect             | Details                            |
+| ------------------ | ---------------------------------- |
+| **Logs**           | Grafana Loki (hosted) - LogQL ✓    |
+| **Metrics**        | Grafana Mimir (hosted) - PromQL ✓  |
+| **Traces**         | Grafana Tempo (hosted) - TraceQL ✓ |
+| **Dashboards**     | Grafana (same as local!)           |
+| **Alerts**         | Grafana Alerting                   |
+| **Query Language** | PromQL + LogQL (SAME as local!)    |
 
 ### Pros ✅
 
-| Pro | Explanation |
-|-----|-------------|
-| **Same as local** | PromQL, LogQL, Grafana UI identical |
-| **Zero ops for observability** | Grafana manages everything |
-| **Free tier generous** | 50GB logs, 10k metrics series |
-| **Dashboard portability** | Export/import JSON works |
-| **Low cost** | Only pay for Alloy container |
-| **Public dashboards** | Easy to share for demo/presentation |
+| Pro                            | Explanation                         |
+| ------------------------------ | ----------------------------------- |
+| **Same as local**              | PromQL, LogQL, Grafana UI identical |
+| **Zero ops for observability** | Grafana manages everything          |
+| **Free tier generous**         | 50GB logs, 10k metrics series       |
+| **Dashboard portability**      | Export/import JSON works            |
+| **Low cost**                   | Only pay for Alloy container        |
+| **Public dashboards**          | Easy to share for demo/presentation |
 
 ### Cons ❌
 
-| Con | Explanation |
-|-----|-------------|
-| **Data leaves Azure** | May have compliance/sovereignty issues |
-| **14-day retention** | Free tier limited, paid for longer |
-| **Rate limits** | May hit limits during load testing |
+| Con                        | Explanation                            |
+| -------------------------- | -------------------------------------- |
+| **Data leaves Azure**      | May have compliance/sovereignty issues |
+| **14-day retention**       | Free tier limited, paid for longer     |
+| **Rate limits**            | May hit limits during load testing     |
 | **Third-party dependency** | Grafana Labs outage = no observability |
-| **Need Alloy container** | Extra container to manage |
+| **Need Alloy container**   | Extra container to manage              |
 
 ### Cost Estimate
 
@@ -776,36 +781,37 @@ Sau khi phân tích Option C (Azure Managed Grafana), ta thấy:
 
 ## Decision Matrix
 
-| Criteria | Weight | A: Azure Native | B: Self-hosted | C: Azure Managed Grafana | D: Grafana Cloud |
-|----------|--------|-----------------|----------------|-------------------------|------------------|
-| **Monthly Cost** | 20% | ⭐⭐⭐⭐ ~$54 | ⭐⭐ ~$127 | ⭐ ~$162 | ⭐⭐⭐⭐ ~$64 |
-| **Ops Overhead** | 20% | ⭐⭐⭐⭐⭐ Zero | ⭐⭐ High | ⭐⭐⭐⭐ Low | ⭐⭐⭐⭐ Low |
-| **Vendor Lock-in** | 15% | ⭐ Very High | ⭐⭐⭐⭐⭐ None | ⭐ Very High | ⭐⭐⭐⭐ Low |
-| **Local/Prod Parity** | 15% | ⭐ KQL≠PromQL | ⭐⭐⭐⭐⭐ 100% | ⭐ KQL≠PromQL | ⭐⭐⭐⭐⭐ 100% |
-| **Dashboard Reuse** | 10% | ⭐ Recreate | ⭐⭐⭐⭐⭐ Export | ⭐ Recreate | ⭐⭐⭐⭐⭐ Export |
-| **Scalability** | 10% | ⭐⭐⭐⭐⭐ Auto | ⭐⭐ Manual | ⭐⭐⭐⭐⭐ Auto | ⭐⭐⭐⭐⭐ Auto |
-| **Data Sovereignty** | 10% | ⭐⭐⭐⭐⭐ Azure | ⭐⭐⭐⭐⭐ Azure | ⭐⭐⭐⭐⭐ Azure | ⭐⭐ External |
-| **Weighted Score** | 100% | 3.25 | 3.45 | **2.45** | **3.90** |
+| Criteria              | Weight | A: Azure Native  | B: Self-hosted    | C: Azure Managed Grafana | D: Grafana Cloud  |
+| --------------------- | ------ | ---------------- | ----------------- | ------------------------ | ----------------- |
+| **Monthly Cost**      | 20%    | ⭐⭐⭐⭐ ~$54    | ⭐⭐ ~$127        | ⭐ ~$162                 | ⭐⭐⭐⭐ ~$64     |
+| **Ops Overhead**      | 20%    | ⭐⭐⭐⭐⭐ Zero  | ⭐⭐ High         | ⭐⭐⭐⭐ Low             | ⭐⭐⭐⭐ Low      |
+| **Vendor Lock-in**    | 15%    | ⭐ Very High     | ⭐⭐⭐⭐⭐ None   | ⭐ Very High             | ⭐⭐⭐⭐ Low      |
+| **Local/Prod Parity** | 15%    | ⭐ KQL≠PromQL    | ⭐⭐⭐⭐⭐ 100%   | ⭐ KQL≠PromQL            | ⭐⭐⭐⭐⭐ 100%   |
+| **Dashboard Reuse**   | 10%    | ⭐ Recreate      | ⭐⭐⭐⭐⭐ Export | ⭐ Recreate              | ⭐⭐⭐⭐⭐ Export |
+| **Scalability**       | 10%    | ⭐⭐⭐⭐⭐ Auto  | ⭐⭐ Manual       | ⭐⭐⭐⭐⭐ Auto          | ⭐⭐⭐⭐⭐ Auto   |
+| **Data Sovereignty**  | 10%    | ⭐⭐⭐⭐⭐ Azure | ⭐⭐⭐⭐⭐ Azure  | ⭐⭐⭐⭐⭐ Azure         | ⭐⭐ External     |
+| **Weighted Score**    | 100%   | 3.25             | 3.45              | **2.45**                 | **3.90**          |
 
 ### Option C là TỆ NHẤT vì:
-- Trả $108/month **CHỈ CHO UI**
-- Backend vẫn dùng KQL → **không portable**
-- Không có lợi ích gì so với Option A
-- "Worst of both worlds"
+
+-   Trả $108/month **CHỈ CHO UI**
+-   Backend vẫn dùng KQL → **không portable**
+-   Không có lợi ích gì so với Option A
+-   "Worst of both worlds"
 
 ---
 
 ## Trade-off Summary Table
 
-| Aspect | A: Azure Native | B: Self-hosted | C: Azure Managed Grafana | D: Grafana Cloud |
-|--------|-----------------|----------------|-------------------------|------------------|
-| **Cost** | ~$54/mo | ~$127/mo | ~$162/mo ❌ | ~$64/mo |
-| **Query Language** | KQL | PromQL/LogQL | KQL | PromQL/LogQL |
-| **Dashboards** | Rebuild | Reuse | Rebuild | Reuse |
-| **Portability** | ❌ Azure only | ✅ Any cloud | ❌ Azure only | ✅ Any cloud |
-| **Ops Work** | Zero | High | Low | Low |
-| **Data Location** | Azure | Azure | Azure | External |
-| **Value for Money** | OK | Good | **POOR** | **Excellent** |
+| Aspect              | A: Azure Native | B: Self-hosted | C: Azure Managed Grafana | D: Grafana Cloud |
+| ------------------- | --------------- | -------------- | ------------------------ | ---------------- |
+| **Cost**            | ~$54/mo         | ~$127/mo       | ~$162/mo ❌              | ~$64/mo          |
+| **Query Language**  | KQL             | PromQL/LogQL   | KQL                      | PromQL/LogQL     |
+| **Dashboards**      | Rebuild         | Reuse          | Rebuild                  | Reuse            |
+| **Portability**     | ❌ Azure only   | ✅ Any cloud   | ❌ Azure only            | ✅ Any cloud     |
+| **Ops Work**        | Zero            | High           | Low                      | Low              |
+| **Data Location**   | Azure           | Azure          | Azure                    | External         |
+| **Value for Money** | OK              | Good           | **POOR**                 | **Excellent**    |
 
 ---
 
@@ -840,34 +846,38 @@ Annual Cost:
 ## When to Choose What
 
 ### Choose Option A (Azure Native) when:
-- ✅ Already committed to Azure ecosystem
-- ✅ Team familiar with KQL
-- ✅ Compliance requires data stay in Azure
-- ✅ Want zero ops overhead
-- ✅ Budget is primary concern
-- ❌ Don't mind recreating dashboards
+
+-   ✅ Already committed to Azure ecosystem
+-   ✅ Team familiar with KQL
+-   ✅ Compliance requires data stay in Azure
+-   ✅ Want zero ops overhead
+-   ✅ Budget is primary concern
+-   ❌ Don't mind recreating dashboards
 
 ### Choose Option B (Self-hosted) when:
-- ✅ Need 100% same stack as local
-- ✅ Multi-cloud strategy planned
-- ✅ Have DevOps capacity
-- ✅ Need unlimited retention
-- ✅ Data must stay in Azure
-- ❌ Budget not a concern
+
+-   ✅ Need 100% same stack as local
+-   ✅ Multi-cloud strategy planned
+-   ✅ Have DevOps capacity
+-   ✅ Need unlimited retention
+-   ✅ Data must stay in Azure
+-   ❌ Budget not a concern
 
 ### ❌ AVOID Option C (Azure Managed Grafana):
-- Pays $108/month ONLY for UI
-- Backend still uses KQL (not portable)
-- No advantage over Option A
-- **Worst value for money**
+
+-   Pays $108/month ONLY for UI
+-   Backend still uses KQL (not portable)
+-   No advantage over Option A
+-   **Worst value for money**
 
 ### Choose Option D (Grafana Cloud) when:
-- ✅ Want same Grafana experience as local
-- ✅ Don't have DevOps capacity for Option B
-- ✅ 14-day retention acceptable
-- ✅ Data leaving Azure is OK
-- ✅ Free tier sufficient for traffic
-- ✅ Easy demo với public dashboards
+
+-   ✅ Want same Grafana experience as local
+-   ✅ Don't have DevOps capacity for Option B
+-   ✅ 14-day retention acceptable
+-   ✅ Data leaving Azure is OK
+-   ✅ Free tier sufficient for traffic
+-   ✅ Easy demo với public dashboards
 
 ---
 
@@ -922,6 +932,7 @@ Annual Cost:
 **Recommended: Option D (ACA + Grafana Cloud)**
 
 Lý do:
+
 1. **Same tooling as local** - không cần học KQL
 2. **Dashboards reusable** - export từ local, import vào cloud
 3. **Free tier đủ dùng** - academic project ít data
@@ -933,21 +944,22 @@ Lý do:
 
 **Fallback: Option A (Azure Native)** - NOT Option C!
 
-- Option A: ~$54/month, KQL, zero ops
-- Option C: ~$162/month, KQL, still Azure backend
+-   Option A: ~$54/month, KQL, zero ops
+-   Option C: ~$162/month, KQL, still Azure backend
 
 **Option C (Azure Managed Grafana) không có lý do để chọn** vì:
-- Đắt hơn Option A ($108 extra chỉ cho UI)
-- Vẫn dùng KQL như Option A
-- Không có thêm benefit gì
+
+-   Đắt hơn Option A ($108 extra chỉ cho UI)
+-   Vẫn dùng KQL như Option A
+-   Không có thêm benefit gì
 
 ---
 
 ## References
 
-- [Azure Container Apps Pricing](https://azure.microsoft.com/en-us/pricing/details/container-apps/)
-- [Application Insights Pricing](https://azure.microsoft.com/en-us/pricing/details/monitor/)
-- [Log Analytics Pricing](https://azure.microsoft.com/en-us/pricing/details/monitor/)
-- [Grafana Cloud Pricing](https://grafana.com/pricing/)
-- [OpenTelemetry Collector](https://opentelemetry.io/docs/collector/)
-- [Grafana Alloy](https://grafana.com/docs/alloy/latest/)
+-   [Azure Container Apps Pricing](https://azure.microsoft.com/en-us/pricing/details/container-apps/)
+-   [Application Insights Pricing](https://azure.microsoft.com/en-us/pricing/details/monitor/)
+-   [Log Analytics Pricing](https://azure.microsoft.com/en-us/pricing/details/monitor/)
+-   [Grafana Cloud Pricing](https://grafana.com/pricing/)
+-   [OpenTelemetry Collector](https://opentelemetry.io/docs/collector/)
+-   [Grafana Alloy](https://grafana.com/docs/alloy/latest/)

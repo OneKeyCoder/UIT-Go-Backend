@@ -22,7 +22,6 @@ type Config struct {
 func main() {
 	// Initialize logger
 	logger.InitDefault("api-gateway")
-	defer logger.Sync()
 
 	logger.Info("Starting API Gateway")
 

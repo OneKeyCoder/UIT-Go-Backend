@@ -38,7 +38,6 @@ type Config struct {
 func main() {
 	// Initialize logger
 	logger.InitDefault("authentication-service")
-	defer logger.Sync()
 
 	logger.Info("Starting authentication service")
 

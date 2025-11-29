@@ -3,6 +3,7 @@ package middleware
 import (
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -37,10 +38,27 @@ var (
 	)
 )
 
+// shouldSkipMetrics returns true if the path should not be recorded in metrics
+func shouldSkipMetrics(path string) bool {
+	skipPaths := []string{"/metrics", "/health", "/healthz", "/ready", "/live"}
+	for _, skip := range skipPaths {
+		if strings.HasPrefix(path, skip) {
+			return true
+		}
+	}
+	return false
+}
+
 // PrometheusMetrics returns a middleware that records HTTP metrics
 func PrometheusMetrics(serviceName string) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Skip metrics recording for /metrics and /health endpoints
+			if shouldSkipMetrics(r.URL.Path) {
+				next.ServeHTTP(w, r)
+				return
+			}
+
 			start := time.Now()
 
 			// Track in-flight requests
