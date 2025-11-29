@@ -2,7 +2,6 @@
 
 volumes:
   postgres-data:
-  postgres-trip-data:
   mongo-data:
   redis-data:
   rabbitmq-data:
@@ -114,7 +113,7 @@ services:
       OTEL_COLLECTOR_ENDPOINT: "jaeger:4317"
 
   postgres:
-    image: "postgres:16-alpine"
+    image: "postgres:17-alpine"
     ports:
       - "5432:5432"
     expose:
