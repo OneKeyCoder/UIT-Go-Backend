@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"logger-service/data"
-	"math"
 	"net/http"
 	"os"
 	"os/signal"
@@ -16,8 +15,8 @@ import (
 
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/env"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/logger"
+	"github.com/OneKeyCoder/UIT-Go-Backend/common/rabbitmq"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/telemetry"
-	amqp "github.com/rabbitmq/amqp091-go"
 	"go.uber.org/zap"
 )
 
@@ -67,7 +66,7 @@ func main() {
 	}
 
 	// Connect to RabbitMQ
-	rabbitConn, err := connectToRabbitMQ()
+	rabbitConn, err := rabbitmq.ConnectSimple(env.RabbitMQURL())
 	if err != nil {
 		logger.Error("Failed to connect to RabbitMQ, continuing without consumer", zap.Error(err))
 	} else {
@@ -80,9 +79,12 @@ func main() {
 			}
 		}()
 		defer func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
 			if err := rabbitConn.Close(); err != nil {
 				logger.Error("Error closing RabbitMQ connection", zap.Error(err))
 			}
+			_ = ctx // avoid unused variable
 		}()
 	}
 
@@ -150,32 +152,4 @@ func connectToMongo() (*mongo.Client, error) {
 
 	logger.Info("Connected to MongoDB successfully")
 	return c, nil
-}
-
-func connectToRabbitMQ() (*amqp.Connection, error) {
-	var counts int64
-	var backOff = 1 * time.Second
-	var connection *amqp.Connection
-	rabbitURL := env.RabbitMQURL()
-
-	for {
-		c, err := amqp.Dial(rabbitURL)
-		if err != nil {
-			logger.Info("RabbitMQ not yet ready...")
-			counts++
-		} else {
-			logger.Info("Connected to rabbitmq")
-			connection = c
-			break
-		}
-
-		if counts > 5 {
-			return nil, err
-		}
-		backOff = time.Duration(math.Pow(float64(counts), 2)) * time.Second
-		logger.Info("backing off...")
-		time.Sleep(backOff)
-		continue
-	}
-	return connection, nil
 }

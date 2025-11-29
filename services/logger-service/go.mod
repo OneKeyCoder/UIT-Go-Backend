@@ -3,12 +3,12 @@ module logger-service
 go 1.24
 
 require (
+	github.com/Azure/go-amqp v1.5.0
 	github.com/OneKeyCoder/UIT-Go-Backend/common v0.0.0
 	github.com/OneKeyCoder/UIT-Go-Backend/proto v0.0.0-00010101000000-000000000000
 	github.com/go-chi/chi/v5 v5.2.3
 	github.com/go-chi/cors v1.2.1
 	github.com/prometheus/client_golang v1.23.2
-	github.com/rabbitmq/amqp091-go v1.10.0
 	go.mongodb.org/mongo-driver v1.17.3
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.63.0
 	go.uber.org/zap v1.27.0

@@ -57,5 +57,13 @@ func (app *Config) checkRabbitMQ() bool {
 	if app.RabbitConn == nil {
 		return false
 	}
-	return !app.RabbitConn.IsClosed()
+	// go-amqp doesn't have IsClosed(), so we check by trying to create a session
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+	session, err := app.RabbitConn.NewSession(ctx, nil)
+	if err != nil {
+		return false
+	}
+	session.Close(ctx)
+	return true
 }

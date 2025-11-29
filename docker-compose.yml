@@ -7,6 +7,8 @@ volumes:
   rabbitmq-data:
   prometheus-data:
   grafana-data:
+  loki-data:
+  jaeger-data:
 
 services:
   api-gateway:
@@ -155,7 +157,7 @@ services:
       - redis-data:/data
 
   rabbitmq:
-    image: "rabbitmq:3.13-management-alpine"
+    image: "rabbitmq:4.2-management-alpine"
     ports:
       - "5672:5672"
       - "15672:15672"
@@ -165,6 +167,7 @@ services:
       RABBITMQ_DEFAULT_PASS: guest
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
+      - ./observability/rabbitmq-config.conf:/etc/rabbitmq/conf.d/20-uit-go.conf:ro
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "ping"]
       interval: 10s
@@ -173,14 +176,23 @@ services:
 
   jaeger:
     image: "jaegertracing/jaeger:2.2.0"
+    user: root # Required for Badger storage write permissions
     ports:
       - "16686:16686" # Jaeger UI
     expose:
       - "4317" # OTLP gRPC receiver
       - "4318" # OTLP HTTP receiver
     restart: unless-stopped
-    environment:
-      COLLECTOR_OTLP_ENABLED: "true"
+    volumes:
+      - ./observability/config-badger.yml:/etc/jaeger/config.yaml:ro
+      - jaeger-data:/badger
+    command: ["--config", "/etc/jaeger/config.yaml"]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:16686/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
 
   prometheus:
     image: "prom/prometheus:v3.2.0"
@@ -188,27 +200,77 @@ services:
       - "9090:9090"
     restart: unless-stopped
     volumes:
-      - ./infrastructure/legacy/prometheus.yml:/etc/prometheus/prometheus.yml:Z
-      - ./infrastructure/legacy/prometheus-alerts.yml:/etc/prometheus/prometheus-alerts.yml:Z
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./observability/prometheus-alerts.yml:/etc/prometheus/alerts/prometheus-alerts.yml:ro
       - prometheus-data:/prometheus
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=15d"
+      - "--web.enable-lifecycle"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   grafana:
-    image: grafana/grafana:12.3.0-19020365962
+    image: grafana/grafana:12.3.0
     ports:
       - "3000:3000"
     restart: unless-stopped
     depends_on:
-      - prometheus
-      - jaeger
+      prometheus:
+        condition: service_healthy
+      loki:
+        condition: service_healthy
+      jaeger:
+        condition: service_healthy
     environment:
+      GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
       GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_FEATURE_TOGGLES_ENABLE: "traceToLogs,correlations"
+      GF_PATHS_PROVISIONING: /etc/grafana/provisioning
+      # Anonymous access for demo
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
     volumes:
-      # - ./compose-volumes/grafana/provisioning:/etc/grafana/provisioning
       - grafana-data:/var/lib/grafana
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+    healthcheck:
+      test:
+        ["CMD", "wget", "-q", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  loki:
+    image: grafana/loki:3.2.1
+    restart: unless-stopped
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./observability/loki-config.yml:/etc/loki/local-config.yaml:ro
+      - loki-data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3100/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  promtail:
+    image: grafana/promtail:3.2.1
+    restart: unless-stopped
+    volumes:
+      - ./observability/promtail-config.yml:/etc/promtail/config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      loki:
+        condition: service_healthy
 
   trip-service:
     build:
