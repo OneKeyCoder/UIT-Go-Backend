@@ -1,3 +1,6 @@
+# Subnet:
+# https://www.davidc.net/sites/default/subnets/subnets.html?network=192.168.0.0&mask=16&division=17.fb100
+
 resource "azurerm_virtual_network" "main" {
   name = "${var.resource_prefix}-vnet"
   resource_group_name = var.resource_group_name
@@ -6,7 +9,7 @@ resource "azurerm_virtual_network" "main" {
 }
 
 resource "azurerm_subnet" "aca" {
-  name = "vnet-aca"
+  name = "subnet-aca"
   resource_group_name = var.resource_group_name
   virtual_network_name = azurerm_virtual_network.main.name
   address_prefixes = ["10.0.0.0/22"] # 1019 hosts (network and broadcast ip, and azure reserves additional 3 ips)
@@ -21,18 +24,17 @@ resource "azurerm_subnet" "aca" {
 }
 
 resource "azurerm_subnet" "dmz" {
-  name = "vnet-dmz"
+  name = "subnet-dmz"
   resource_group_name = var.resource_group_name
   virtual_network_name = azurerm_virtual_network.main.name
   address_prefixes = ["10.0.4.0/24"] # 251
 }
 
-# for postgres "server" - delegated
-resource "azurerm_subnet" "postgres-db" {
-  name = "vnet-dmz"
+resource "azurerm_subnet" "postgres" {
+  name = "subnet-postgres"
   resource_group_name = var.resource_group_name
   virtual_network_name = azurerm_virtual_network.main.name
-  address_prefixes = ["10.0.4.0/24"] # 251
+  address_prefixes = ["10.0.5.0/24"] # 251
 
   delegation {
     name = "postgres-delegation"
