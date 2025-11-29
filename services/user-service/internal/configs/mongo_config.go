@@ -9,7 +9,6 @@ import (
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/logger"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.uber.org/zap"
 )
 
 type MongoConfig struct {
@@ -43,7 +42,7 @@ func GetMongoConfig() *MongoConfig {
 func ConnectMongo() (*mongo.Client, error) {
 	// Check if MONGO_URL is provided (for docker-compose)
 	if mongoURL := os.Getenv("MONGO_URL"); mongoURL != "" {
-		logger.Info("Using MONGO_URL from environment", zap.String("url", mongoURL))
+		logger.Info("Using MONGO_URL from environment", "url", mongoURL)
 
 		// Set client options
 		clientOptions := options.Client().ApplyURI(mongoURL)
@@ -101,9 +100,9 @@ func ConnectMongo() (*mongo.Client, error) {
 	}
 
 	logger.Info("Successfully connected to MongoDB",
-		zap.String("host", config.Host),
-		zap.String("port", config.Port),
-		zap.String("database", config.Database))
+		"host", config.Host,
+		"port", config.Port,
+		"database", config.Database)
 
 	return client, nil
 }

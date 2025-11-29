@@ -224,8 +224,8 @@ func (app *Config) Register(w http.ResponseWriter, r *http.Request) {
 		})
 		if err != nil {
 			logger.Warn("Failed to create user in user-service",
-				zap.String("email", requestPayload.Email),
-				zap.Error(err),
+				"email", requestPayload.Email,
+				"error", err,
 			)
 			// Don't fail the registration if user-service is down
 		}

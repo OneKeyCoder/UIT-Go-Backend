@@ -31,14 +31,11 @@ type Config struct {
 }
 
 func main() {
-	// Initialize logger
-	logger.InitDefault(serviceName)
-	logger.Info("Starting Location Service", "version", serviceVersion)
-
-	// Initialize telemetry
+	// Initialize telemetry FIRST (sets up OTLP LoggerProvider)
 	shutdown, err := telemetry.InitTracer(serviceName, serviceVersion)
 	if err != nil {
-		logger.Error("Failed to initialize tracer", "error", err)
+		// Use basic println since logger not initialized yet
+		fmt.Printf("Failed to initialize tracer: %v\n", err)
 	} else {
 		defer func() {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -48,6 +45,10 @@ func main() {
 			}
 		}()
 	}
+
+	// Initialize logger AFTER telemetry (to pick up OTLP provider)
+	logger.InitDefault(serviceName)
+	logger.Info("Starting Location Service", "version", serviceVersion)
 
 	logger.Info("Connecting to Redis...")
 	redisClient, err := configs.ConnectRedis()

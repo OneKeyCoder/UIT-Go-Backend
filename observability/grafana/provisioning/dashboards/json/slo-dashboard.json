@@ -265,7 +265,7 @@
       "type": "stat",
       "targets": [
         {
-          "expr": "sum(up{job=~\"api-gateway|authentication-service|logger-service|location-service|trip-service\"})",
+          "expr": "sum(up{job=~\"api-gateway|authentication-service|logger-service|location-service|trip-service|user-service\"})",
           "refId": "A"
         }
       ]
@@ -763,7 +763,7 @@
       "type": "logs",
       "targets": [
         {
-          "expr": "{service_name=~\"api-gateway|authentication-service|logger-service|location-service|trip-service\"}",
+          "expr": "{service_name=~\"api-gateway|authentication-service|logger-service|location-service|trip-service|user-service\"}",
           "refId": "A"
         }
       ]

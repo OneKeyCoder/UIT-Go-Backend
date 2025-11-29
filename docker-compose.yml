@@ -331,9 +331,12 @@ services:
     depends_on:
       mongo:
         condition: service_started
+      alloy:
+        condition: service_started
       jaeger:
         condition: service_started
     environment:
       MONGO_URL: "mongodb://admin:password@mongo:27017"
       OTEL_EXPORTER: "otlp"
-      OTEL_COLLECTOR_ENDPOINT: "jaeger:4317"
+      OTEL_COLLECTOR_ENDPOINT: "alloy:4317"
+      OTEL_INSECURE: "true"

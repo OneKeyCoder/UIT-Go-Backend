@@ -24,11 +24,12 @@ type Config struct {
 
 func main() {
 	var app Config
-	logger.InitDefault("trip-service")
-	logger.Info("Starting trip service")
+
+	// Initialize telemetry FIRST (sets up OTLP LoggerProvider)
 	shutdown, err := telemetry.InitTracer("trip-service", "1.0.0")
 	if err != nil {
-		logger.Error("Failed to initialize tracer", "error", err)
+		// Use basic println since logger not initialized yet
+		fmt.Printf("Failed to initialize tracer: %v\n", err)
 	} else {
 		defer func() {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -38,6 +39,10 @@ func main() {
 			}
 		}()
 	}
+
+	// Initialize logger AFTER telemetry (to pick up OTLP provider)
+	logger.InitDefault("trip-service")
+	logger.Info("Starting trip service")
 	service := TripService{}
 	service.InitializeServices()
 	app.TripService = &service

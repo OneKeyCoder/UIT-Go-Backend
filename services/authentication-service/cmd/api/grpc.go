@@ -27,7 +27,7 @@ type AuthServer struct {
 // Authenticate handles user authentication
 func (s *AuthServer) Register(ctx context.Context, req *pb.RegisterRequest) (*pb.RegisterResponse, error) {
 	logger.Info("gRPC register request",
-		zap.String("email", req.Email),
+		"email", req.Email,
 	)
 
 	// Check if user already exists
@@ -48,7 +48,7 @@ func (s *AuthServer) Register(ctx context.Context, req *pb.RegisterRequest) (*pb
 
 	userID, err := s.Config.Models.User.Insert(newUser)
 	if err != nil {
-		logger.Error("Failed to create user", zap.Error(err))
+		logger.Error("Failed to create user", "error", err)
 		return nil, status.Error(codes.Internal, "Failed to create user")
 	}
 
@@ -64,8 +64,8 @@ func (s *AuthServer) Register(ctx context.Context, req *pb.RegisterRequest) (*pb
 		})
 		if err != nil {
 			logger.Warn("Failed to create user in user-service",
-				zap.String("email", req.Email),
-				zap.Error(err),
+				"email", req.Email,
+				"error", err,
 			)
 			// Don't fail registration if user-service is down
 		}
@@ -74,13 +74,13 @@ func (s *AuthServer) Register(ctx context.Context, req *pb.RegisterRequest) (*pb
 	// Get the created user
 	user, err := s.Config.Models.User.GetOne(userID)
 	if err != nil {
-		logger.Error("Failed to get created user", zap.Error(err))
+		logger.Error("Failed to get created user", "error", err)
 		return nil, status.Error(codes.Internal, "User created but failed to retrieve")
 	}
 
 	logger.Info("User registered successfully (gRPC)",
-		zap.String("email", user.Email),
-		zap.Int("user_id", user.ID),
+		"email", user.Email,
+		"user_id", user.ID,
 	)
 
 	return &pb.RegisterResponse{

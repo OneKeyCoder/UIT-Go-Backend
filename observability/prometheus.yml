@@ -85,6 +85,17 @@ scrape_configs:
       - target_label: service
         replacement: trip-service
 
+  # User Service
+  - job_name: 'user-service'
+    static_configs:
+      - targets: ['user-service:80']
+    metrics_path: /metrics
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+      - target_label: service
+        replacement: user-service
+
   # Jaeger - for tracing infrastructure health
   - job_name: 'jaeger'
     static_configs:
