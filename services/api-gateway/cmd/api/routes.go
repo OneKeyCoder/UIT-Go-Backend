@@ -58,6 +58,15 @@ func (app *Config) routes() http.Handler {
 	mux.Post("/", app.Broker)
 
 	// gRPC-based routes (using persistent clients with interceptors)
+	mux.Post("/grpc/register", func(w http.ResponseWriter, r *http.Request) {
+		var regPayload RegisterPayload
+		err := request.ReadAndValidate(w, r, &regPayload)
+		if request.HandleError(w, err) {
+			return
+		}
+		app.registerViaGRPC(w, r, regPayload)
+	})
+
 	mux.Post("/grpc/auth", func(w http.ResponseWriter, r *http.Request) {
 		var authPayload AuthPayload
 		err := request.ReadAndValidate(w, r, &authPayload)
@@ -99,5 +108,26 @@ func (app *Config) routes() http.Handler {
 		r.Put("/review/{tripID}", app.SubmitReview)
 		r.Get("/review/{tripID}", app.GetTripReview)
 	})
+
+	// User and Vehicle routes
+	mux.Route("/users", func(r chi.Router) {
+		r.Use(app.AuthRequired)
+		r.Get("/", app.GetAllUsers)
+		r.Get("/{id}", app.GetUserById)
+		r.Post("/", app.CreateUser)
+		r.Put("/{id}", app.UpdateUser)
+		r.Delete("/{id}", app.DeleteUser)
+		r.Get("/{id}/vehicles", app.GetVehiclesByUserId)
+	})
+
+	mux.Route("/vehicles", func(r chi.Router) {
+		r.Use(app.AuthRequired)
+		r.Get("/", app.GetAllVehicles)
+		r.Get("/{id}", app.GetVehicleById)
+		r.Post("/", app.CreateVehicle)
+		r.Put("/{id}", app.UpdateVehicle)
+		r.Delete("/{id}", app.DeleteVehicle)
+	})
+
 	return mux
 }

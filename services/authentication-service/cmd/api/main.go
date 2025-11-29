@@ -15,12 +15,16 @@ import (
 	_ "github.com/jackc/pgx/v5"
 	_ "github.com/jackc/pgx/v5/stdlib"
 
+	"github.com/OneKeyCoder/UIT-Go-Backend/common/grpcutil"
 	"github.com/Azure/go-amqp"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/env"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/logger"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/rabbitmq"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/telemetry"
+  	userpb "github.com/OneKeyCoder/UIT-Go-Backend/proto/user"
 	"go.uber.org/zap"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 const webPort = "80"
@@ -34,6 +38,7 @@ type Config struct {
 	JWTExpiry     time.Duration
 	RefreshExpiry time.Duration
 	RabbitConn    *amqp.Conn
+  	UserClient    userpb.UserServiceClient
 }
 
 func main() {
@@ -97,6 +102,21 @@ func main() {
 		}()
 	}
 
+	// Connect to user-service via gRPC
+	userConn, err := grpc.NewClient(
+		"user-service:50055",
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithUnaryInterceptor(grpcutil.UnaryClientInterceptor()),
+	)
+	if err != nil {
+		logger.Error("Failed to connect to user-service", zap.Error(err))
+	} else {
+		logger.Info("Connected to user-service gRPC")
+		defer userConn.Close()
+	}
+
+	userClient := userpb.NewUserServiceClient(userConn)
+
 	// set up config
 	app := Config{
 		DB:            conn,
@@ -105,6 +125,7 @@ func main() {
 		JWTExpiry:     jwtExpiry,
 		RefreshExpiry: refreshExpiry,
 		RabbitConn:    rabbitConn,
+		UserClient:    userClient,
 	}
 
 	logger.Info("Starting HTTP server",

@@ -6,6 +6,9 @@ option go_package = "github.com/OneKeyCoder/UIT-Go-Backend/proto/auth";
 
 // AuthService provides authentication and authorization
 service AuthService {
+  // Register creates a new user account
+  rpc Register(RegisterRequest) returns (RegisterResponse);
+
   // Authenticate validates user credentials and returns JWT tokens
   rpc Authenticate(AuthRequest) returns (AuthResponse);
 
@@ -19,6 +22,19 @@ service AuthService {
 message AuthRequest {
   string email = 1;
   string password = 2;
+}
+
+message RegisterRequest {
+  string email = 1;
+  string password = 2;
+  string first_name = 3;
+  string last_name = 4;
+}
+
+message RegisterResponse {
+  bool success = 1;
+  string message = 2;
+  User user = 3;
 }
 
 message AuthResponse {

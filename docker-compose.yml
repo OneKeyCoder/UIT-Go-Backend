@@ -28,6 +28,8 @@ services:
         condition: service_started
       trip-service:
         condition: service_started
+      user-service:
+        condition: service_started
       jaeger:
         condition: service_started
     environment:
@@ -75,6 +77,8 @@ services:
       rabbitmq:
         condition: service_healthy
       postgres:
+        condition: service_started
+      user-service:
         condition: service_started
       jaeger:
         condition: service_started
@@ -148,7 +152,7 @@ services:
       start_period: 40s
 
   redis:
-    image: "redis:7-alpine"
+    image: "redis:7.2.5-alpine"
     ports:
       - "6381:6379"
     restart: unless-stopped
@@ -297,5 +301,24 @@ services:
       RABBITMQ_USER: "guest"
       RABBITMQ_PASSWORD: "guest"
       RABBITMQ_VHOST: "/"
+      OTEL_EXPORTER: "otlp"
+      OTEL_COLLECTOR_ENDPOINT: "jaeger:4317"
+
+  user-service:
+    build:
+      context: ./services
+      dockerfile: user-service/user-service.dockerfile
+    image: user-service
+    restart: unless-stopped
+    expose:
+      - "80"
+      - "50055"
+    depends_on:
+      mongo:
+        condition: service_started
+      jaeger:
+        condition: service_started
+    environment:
+      MONGO_URL: "mongodb://admin:password@mongo:27017"
       OTEL_EXPORTER: "otlp"
       OTEL_COLLECTOR_ENDPOINT: "jaeger:4317"

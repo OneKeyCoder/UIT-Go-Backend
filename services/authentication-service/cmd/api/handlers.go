@@ -3,16 +3,19 @@ package main
 import (
 	"authentication-service/data"
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/jwt"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/logger"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/request"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/response"
+	userpb "github.com/OneKeyCoder/UIT-Go-Backend/proto/user"
 	"go.uber.org/zap"
 )
 
@@ -35,8 +38,8 @@ type ChangePasswordRequest struct {
 }
 
 type AuthResponse struct {
-	User   interface{}      `json:"user"`
-	Tokens *jwt.TokenPair   `json:"tokens"`
+	User   interface{}    `json:"user"`
+	Tokens *jwt.TokenPair `json:"tokens"`
 }
 
 func (app *Config) Authenticate(w http.ResponseWriter, r *http.Request) {
@@ -209,6 +212,25 @@ func (app *Config) Register(w http.ResponseWriter, r *http.Request) {
 		zap.String("email", requestPayload.Email),
 		zap.Int("user_id", userID),
 	)
+
+	// Create user in user-service via gRPC
+	if app.UserClient != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		_, err = app.UserClient.CreateUser(ctx, &userpb.CreateUserRequest{
+			Email:     requestPayload.Email,
+			FirstName: requestPayload.FirstName,
+			LastName:  requestPayload.LastName,
+		})
+		if err != nil {
+			logger.Warn("Failed to create user in user-service",
+				zap.String("email", requestPayload.Email),
+				zap.Error(err),
+			)
+			// Don't fail the registration if user-service is down
+		}
+	}
 
 	// Log registration event
 	_ = app.logRequest("registration", fmt.Sprintf("New user registered: %s", requestPayload.Email))
