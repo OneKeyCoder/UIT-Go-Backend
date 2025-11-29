@@ -8,7 +8,6 @@ import (
 
 	"github.com/Azure/go-amqp"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/logger"
-	"go.uber.org/zap"
 )
 
 // LogMessage represents the structure of messages received from RabbitMQ
@@ -52,7 +51,7 @@ func (app *Config) ConsumeFromRabbitMQ(conn *amqp.Conn) error {
 		Credit: 10, // Prefetch count - number of messages to buffer
 	})
 	if err != nil {
-		logger.Error("Failed to create RabbitMQ receiver", zap.Error(err))
+		logger.Error("Failed to create RabbitMQ receiver", "error", err)
 		return err
 	}
 	defer func() {
@@ -61,7 +60,7 @@ func (app *Config) ConsumeFromRabbitMQ(conn *amqp.Conn) error {
 		receiver.Close(ctx)
 	}()
 
-	logger.Info("RabbitMQ consumer ready", zap.String("address", "/queues/logs"))
+	logger.Info("RabbitMQ consumer ready", "address", "/queues/logs")
 
 	// Process messages in a loop
 	for {
@@ -69,7 +68,7 @@ func (app *Config) ConsumeFromRabbitMQ(conn *amqp.Conn) error {
 		ctx := context.Background()
 		msg, err := receiver.Receive(ctx, nil)
 		if err != nil {
-			logger.Error("Failed to receive message", zap.Error(err))
+			logger.Error("Failed to receive message", "error", err)
 			continue
 		}
 
@@ -77,17 +76,17 @@ func (app *Config) ConsumeFromRabbitMQ(conn *amqp.Conn) error {
 		var logMsg LogMessage
 		err = json.Unmarshal(msg.GetData(), &logMsg)
 		if err != nil {
-			logger.Error("Failed to unmarshal log message", zap.Error(err))
+			logger.Error("Failed to unmarshal log message", "error", err)
 			// Reject the message so it can be redelivered or dead-lettered
 			if err := receiver.RejectMessage(ctx, msg, nil); err != nil {
-				logger.Error("Failed to reject message", zap.Error(err))
+				logger.Error("Failed to reject message", "error", err)
 			}
 			continue
 		}
 
 		logger.Info("Received log message from RabbitMQ",
-			zap.String("name", logMsg.Name),
-			zap.String("data", logMsg.Data))
+			"name", logMsg.Name,
+			"data", logMsg.Data)
 
 		// Write to MongoDB
 		logEntry := data.LogEntry{
@@ -100,16 +99,16 @@ func (app *Config) ConsumeFromRabbitMQ(conn *amqp.Conn) error {
 		err = app.Models.LogEntry.Insert(logEntry)
 
 		if err != nil {
-			logger.Error("Failed to insert log entry", zap.Error(err))
+			logger.Error("Failed to insert log entry", "error", err)
 			// Reject and requeue the message
 			if err := receiver.RejectMessage(ctx, msg, nil); err != nil {
-				logger.Error("Failed to reject message", zap.Error(err))
+				logger.Error("Failed to reject message", "error", err)
 			}
 		} else {
-			logger.Info("Successfully wrote log to MongoDB", zap.String("name", logMsg.Name))
+			logger.Info("Successfully wrote log to MongoDB", "name", logMsg.Name)
 
 			if err := receiver.AcceptMessage(ctx, msg); err != nil {
-				logger.Error("Failed to accept message", zap.Error(err))
+				logger.Error("Failed to accept message", "error", err)
 			}
 		}
 	}

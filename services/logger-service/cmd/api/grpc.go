@@ -10,7 +10,6 @@ import (
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/logger"
 	pb "github.com/OneKeyCoder/UIT-Go-Backend/proto/logger"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
-	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
@@ -39,15 +38,15 @@ func (app *Config) StartGRPCServer() error {
 	pb.RegisterLoggerServiceServer(s, &LoggerServer{Models: app.Models})
 	reflection.Register(s)
 
-	logger.Info("Starting gRPC server", zap.String("port", grpcPort))
+	logger.Info("Starting gRPC server", "port", grpcPort)
 	return s.Serve(lis)
 }
 
 // WriteLog implements the WriteLog RPC method
 func (l *LoggerServer) WriteLog(ctx context.Context, req *pb.LogRequest) (*pb.LogResponse, error) {
 	logger.Info("WriteLog called via gRPC",
-		zap.String("name", req.GetName()),
-		zap.String("data", req.GetData()))
+		"name", req.GetName(),
+		"data", req.GetData())
 
 	logEntry := data.LogEntry{
 		Name: req.GetName(),
@@ -56,7 +55,7 @@ func (l *LoggerServer) WriteLog(ctx context.Context, req *pb.LogRequest) (*pb.Lo
 
 	err := l.Models.LogEntry.Insert(logEntry)
 	if err != nil {
-		logger.Error("Failed to insert log", zap.Error(err))
+		logger.Error("Failed to insert log", "error", err)
 		return &pb.LogResponse{
 			Success: false,
 			Message: "Failed to write log",
@@ -71,11 +70,11 @@ func (l *LoggerServer) WriteLog(ctx context.Context, req *pb.LogRequest) (*pb.Lo
 
 // GetLogs implements the GetLogs RPC method
 func (l *LoggerServer) GetLogs(ctx context.Context, req *pb.GetLogsRequest) (*pb.GetLogsResponse, error) {
-	logger.Info("GetLogs called via gRPC", zap.Int32("limit", req.GetLimit()))
+	logger.Info("GetLogs called via gRPC", "limit", req.GetLimit())
 
 	logs, err := l.Models.LogEntry.All()
 	if err != nil {
-		logger.Error("Failed to get logs", zap.Error(err))
+		logger.Error("Failed to get logs", "error", err)
 		return nil, err
 	}
 

@@ -22,7 +22,6 @@ import (
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/rabbitmq"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/telemetry"
   	userpb "github.com/OneKeyCoder/UIT-Go-Backend/proto/user"
-	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -42,25 +41,24 @@ type Config struct {
 }
 
 func main() {
-	// Initialize logger
-	logger.InitDefault("authentication-service")
-	defer logger.Sync()
-
-	logger.Info("Starting authentication service")
-
-	// Initialize tracing
+	// Initialize tracing FIRST (sets up OTLP LoggerProvider)
 	shutdown, err := telemetry.InitTracer("authentication-service", "1.0.0")
 	if err != nil {
-		logger.Error("Failed to initialize tracer", zap.Error(err))
+		// Use basic println since logger not initialized yet
+		fmt.Printf("Failed to initialize tracer: %v\n", err)
 	} else {
 		defer func() {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			if err := shutdown(ctx); err != nil {
-				logger.Error("Failed to shutdown tracer", zap.Error(err))
+				logger.Error("Failed to shutdown tracer", "error", err)
 			}
 		}()
 	}
+
+	// Initialize logger AFTER telemetry (to pick up OTLP provider)
+	logger.InitDefault("authentication-service")
+	logger.Info("Starting authentication service")
 
 	// connect to DB
 	conn := connectToDB()
@@ -92,12 +90,12 @@ func main() {
 	// Connect to RabbitMQ
 	rabbitConn, err := rabbitmq.ConnectSimple(env.RabbitMQURL())
 	if err != nil {
-		logger.Error("Failed to connect to RabbitMQ, continuing without events", zap.Error(err))
+		logger.Error("Failed to connect to RabbitMQ, continuing without events", "error", err)
 	} else {
 		logger.Info("Connected to RabbitMQ")
 		defer func() {
 			if err := rabbitConn.Close(); err != nil {
-				logger.Error("Error closing RabbitMQ connection", zap.Error(err))
+				logger.Error("Error closing RabbitMQ connection", "error", err)
 			}
 		}()
 	}
@@ -109,7 +107,7 @@ func main() {
 		grpc.WithUnaryInterceptor(grpcutil.UnaryClientInterceptor()),
 	)
 	if err != nil {
-		logger.Error("Failed to connect to user-service", zap.Error(err))
+		logger.Error("Failed to connect to user-service", "error", err)
 	} else {
 		logger.Info("Connected to user-service gRPC")
 		defer userConn.Close()
@@ -129,15 +127,15 @@ func main() {
 	}
 
 	logger.Info("Starting HTTP server",
-		zap.String("port", webPort),
-		zap.Duration("jwt_expiry", jwtExpiry),
-		zap.Duration("refresh_expiry", refreshExpiry),
+		"port", webPort,
+		"jwt_expiry", jwtExpiry,
+		"refresh_expiry", refreshExpiry,
 	)
 
 	go func() {
 		err := app.StartGRPCServer()
 		if err != nil {
-			logger.Fatal("gRPC server failed", zap.Error(err))
+			logger.Fatal("gRPC server failed", "error", err)
 		}
 	}()
 
@@ -149,7 +147,7 @@ func main() {
 	// Start server in goroutine
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Fatal("Server failed", zap.Error(err))
+			logger.Fatal("Server failed", "error", err)
 		}
 	}()
 
@@ -165,7 +163,7 @@ func main() {
 	defer cancel()
 
 	if err := srv.Shutdown(ctx); err != nil {
-		logger.Error("Server forced to shutdown", zap.Error(err))
+		logger.Error("Server forced to shutdown", "error", err)
 	}
 
 	logger.Info("Server exited")
@@ -197,8 +195,8 @@ func connectToDB() *sql.DB {
 		connection, err := openDB(dsn)
 		if err != nil {
 			logger.Warn("Postgres not yet ready, retrying...",
-				zap.Int64("attempt", counts+1),
-				zap.Error(err),
+				"attempt", counts+1,
+				"error", err,
 			)
 			counts++
 		} else {
@@ -207,7 +205,7 @@ func connectToDB() *sql.DB {
 		}
 
 		if counts > 10 {
-			logger.Error("Failed to connect to Postgres after 10 attempts", zap.Error(err))
+			logger.Error("Failed to connect to Postgres after 10 attempts", "error", err)
 			return nil
 		}
 

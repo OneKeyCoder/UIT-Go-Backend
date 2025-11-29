@@ -28,13 +28,16 @@ services:
         condition: service_started
       trip-service:
         condition: service_started
+      alloy:
+        condition: service_started
       user-service:
         condition: service_started
       jaeger:
         condition: service_started
     environment:
       OTEL_EXPORTER: "otlp"
-      OTEL_COLLECTOR_ENDPOINT: "jaeger:4317"
+      OTEL_COLLECTOR_ENDPOINT: "alloy:4317"
+      OTEL_INSECURE: "true"
 
   logger-service:
     build:
@@ -50,7 +53,7 @@ services:
         condition: service_started
       rabbitmq:
         condition: service_healthy
-      jaeger:
+      alloy:
         condition: service_started
     environment:
       MONGO_URL: "mongodb://mongo:27017"
@@ -62,7 +65,8 @@ services:
       RABBITMQ_PASSWORD: "guest"
       RABBITMQ_VHOST: "/"
       OTEL_EXPORTER: "otlp"
-      OTEL_COLLECTOR_ENDPOINT: "jaeger:4317"
+      OTEL_COLLECTOR_ENDPOINT: "alloy:4317"
+      OTEL_INSECURE: "true"
 
   authentication-service:
     build:
@@ -77,6 +81,8 @@ services:
       rabbitmq:
         condition: service_healthy
       postgres:
+        condition: service_started
+      alloy:
         condition: service_started
       user-service:
         condition: service_started
@@ -93,7 +99,8 @@ services:
       RABBITMQ_PASSWORD: "guest"
       RABBITMQ_VHOST: "/"
       OTEL_EXPORTER: "otlp"
-      OTEL_COLLECTOR_ENDPOINT: "jaeger:4317"
+      OTEL_COLLECTOR_ENDPOINT: "alloy:4317"
+      OTEL_INSECURE: "true"
 
   location-service:
     build:
@@ -107,7 +114,7 @@ services:
     depends_on:
       redis:
         condition: service_started
-      jaeger:
+      alloy:
         condition: service_started
     environment:
       REDIS_HOST: "redis"
@@ -116,7 +123,8 @@ services:
       REDIS_DB: "0"
       REDIS_TIME_TO_LIVE: "3600"
       OTEL_EXPORTER: "otlp"
-      OTEL_COLLECTOR_ENDPOINT: "jaeger:4317"
+      OTEL_COLLECTOR_ENDPOINT: "alloy:4317"
+      OTEL_INSECURE: "true"
 
   postgres:
     image: "postgres:17-alpine"
@@ -186,6 +194,7 @@ services:
     expose:
       - "4317" # OTLP gRPC receiver
       - "4318" # OTLP HTTP receiver
+      - "8888"
     restart: unless-stopped
     volumes:
       - ./observability/config-badger.yml:/etc/jaeger/config.yaml:ro
@@ -212,6 +221,7 @@ services:
       - "--storage.tsdb.path=/prometheus"
       - "--storage.tsdb.retention.time=15d"
       - "--web.enable-lifecycle"
+      - "--web.enable-remote-write-receiver"  # Enable remote write for OTLP metrics
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/-/healthy"]
       interval: 30s
@@ -264,16 +274,21 @@ services:
       timeout: 10s
       retries: 3
 
-  promtail:
-    image: grafana/promtail:3.2.1
+  alloy:
+    image: grafana/alloy:latest
     restart: unless-stopped
+    ports:
+      - "12345:12345"  # Alloy UI
+    expose:
+      - "4317"  # OTLP gRPC
+      - "4318"  # OTLP HTTP
     volumes:
-      - ./observability/promtail-config.yml:/etc/promtail/config.yml:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - /var/lib/docker/containers:/var/lib/docker/containers:ro
-    command: -config.file=/etc/promtail/config.yml
+      - ./observability/alloy-config.alloy:/etc/alloy/config.alloy:ro
+    command: ["run", "/etc/alloy/config.alloy", "--server.http.listen-addr=0.0.0.0:12345"]
     depends_on:
       loki:
+        condition: service_healthy
+      jaeger:
         condition: service_healthy
 
   trip-service:
@@ -290,7 +305,7 @@ services:
         condition: service_started
       rabbitmq:
         condition: service_healthy
-      jaeger:
+      alloy:
         condition: service_started
     environment:
       DSN: "host=postgres port=5432 user=postgres password=password dbname=trips sslmode=disable timezone=UTC connect_timeout=5"
@@ -302,7 +317,8 @@ services:
       RABBITMQ_PASSWORD: "guest"
       RABBITMQ_VHOST: "/"
       OTEL_EXPORTER: "otlp"
-      OTEL_COLLECTOR_ENDPOINT: "jaeger:4317"
+      OTEL_COLLECTOR_ENDPOINT: "alloy:4317"
+      OTEL_INSECURE: "true"
 
   user-service:
     build:
@@ -316,9 +332,12 @@ services:
     depends_on:
       mongo:
         condition: service_started
+      alloy:
+        condition: service_started
       jaeger:
         condition: service_started
     environment:
       MONGO_URL: "mongodb://admin:password@mongo:27017"
       OTEL_EXPORTER: "otlp"
-      OTEL_COLLECTOR_ENDPOINT: "jaeger:4317"
+      OTEL_COLLECTOR_ENDPOINT: "alloy:4317"
+      OTEL_INSECURE: "true"

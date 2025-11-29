@@ -9,7 +9,6 @@ import (
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/response"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/telemetry"
 	"github.com/go-chi/chi/v5"
-	"go.uber.org/zap"
 )
 
 type RegisterPayload struct {
@@ -416,7 +415,7 @@ func (app *Config) GetSuggestedDriver(w http.ResponseWriter, r *http.Request) {
 		response.BadRequest(w, "Invalid trip ID")
 		return
 	}
-	logger.Info("Trip ID:", zap.String("tripId from URL", tripID))
+	logger.Info("Trip ID:", "tripId from URL", tripID)
 	tripIDInt, err := strconv.Atoi(tripID)
 	if err != nil {
 		response.BadRequest(w, "Trip ID must be an integer")
@@ -440,12 +439,12 @@ func (app *Config) GetTripDetails(w http.ResponseWriter, r *http.Request) {
 		response.Unauthorized(w, "Unauthorized: "+err.Error())
 		return
 	}
-	logger.Info("Request URL", zap.String("URL", r.URL.Path))
+	logger.Info("Request URL", "URL", r.URL.Path)
 	for key := range chi.RouteContext(r.Context()).URLParams.Keys {
-		logger.Info("Param key:", zap.Any("key", chi.RouteContext(r.Context()).URLParams.Keys[key]))
+		logger.Info("Param key:", "key", chi.RouteContext(r.Context()).URLParams.Keys[key])
 	}
 	tripID := chi.URLParam(r, "tripID")
-	logger.Info("Trip ID:", zap.String("tripId from URL", tripID))
+	logger.Info("Trip ID:", "tripId from URL", tripID)
 	if tripID == "" {
 		response.BadRequest(w, "Invalid trip ID")
 		return

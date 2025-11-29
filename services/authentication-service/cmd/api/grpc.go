@@ -13,7 +13,6 @@ import (
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/logger"
 	pb "github.com/OneKeyCoder/UIT-Go-Backend/proto/auth"
 	userpb "github.com/OneKeyCoder/UIT-Go-Backend/proto/user"
-	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -28,7 +27,7 @@ type AuthServer struct {
 // Authenticate handles user authentication
 func (s *AuthServer) Register(ctx context.Context, req *pb.RegisterRequest) (*pb.RegisterResponse, error) {
 	logger.Info("gRPC register request",
-		zap.String("email", req.Email),
+		"email", req.Email,
 	)
 
 	// Check if user already exists
@@ -49,7 +48,7 @@ func (s *AuthServer) Register(ctx context.Context, req *pb.RegisterRequest) (*pb
 
 	userID, err := s.Config.Models.User.Insert(newUser)
 	if err != nil {
-		logger.Error("Failed to create user", zap.Error(err))
+		logger.Error("Failed to create user", "error", err)
 		return nil, status.Error(codes.Internal, "Failed to create user")
 	}
 
@@ -65,8 +64,8 @@ func (s *AuthServer) Register(ctx context.Context, req *pb.RegisterRequest) (*pb
 		})
 		if err != nil {
 			logger.Warn("Failed to create user in user-service",
-				zap.String("email", req.Email),
-				zap.Error(err),
+				"email", req.Email,
+				"error", err,
 			)
 			// Don't fail registration if user-service is down
 		}
@@ -75,13 +74,13 @@ func (s *AuthServer) Register(ctx context.Context, req *pb.RegisterRequest) (*pb
 	// Get the created user
 	user, err := s.Config.Models.User.GetOne(userID)
 	if err != nil {
-		logger.Error("Failed to get created user", zap.Error(err))
+		logger.Error("Failed to get created user", "error", err)
 		return nil, status.Error(codes.Internal, "User created but failed to retrieve")
 	}
 
 	logger.Info("User registered successfully (gRPC)",
-		zap.String("email", user.Email),
-		zap.Int("user_id", user.ID),
+		"email", user.Email,
+		"user_id", user.ID,
 	)
 
 	return &pb.RegisterResponse{
@@ -100,26 +99,26 @@ func (s *AuthServer) Register(ctx context.Context, req *pb.RegisterRequest) (*pb
 // Authenticate handles user authentication
 func (s *AuthServer) Authenticate(ctx context.Context, req *pb.AuthRequest) (*pb.AuthResponse, error) {
 	logger.Info("gRPC authentication request",
-		zap.String("email", req.Email),
+		"email", req.Email,
 	)
 
 	// Validate user credentials
 	user, err := s.Config.Models.User.GetByEmail(req.Email)
 	if err != nil {
-		logger.Error("User not found", zap.String("email", req.Email), zap.Error(err))
+		logger.Error("User not found", "email", req.Email, "error", err)
 		return nil, status.Error(codes.Unauthenticated, "Invalid credentials")
 	}
 
 	// Check password
 	valid, err := user.PasswordMatches(req.Password)
 	if err != nil || !valid {
-		logger.Error("Invalid password", zap.String("email", req.Email))
+		logger.Error("Invalid password", "email", req.Email)
 		return nil, status.Error(codes.Unauthenticated, "Invalid credentials")
 	}
 
 	// Check if user is active
 	if user.Active == 0 {
-		logger.Error("Inactive user attempted login", zap.String("email", req.Email))
+		logger.Error("Inactive user attempted login", "email", req.Email)
 		return nil, status.Error(codes.PermissionDenied, "User account is inactive")
 	}
 
@@ -133,13 +132,13 @@ func (s *AuthServer) Authenticate(ctx context.Context, req *pb.AuthRequest) (*pb
 		s.Config.RefreshExpiry,
 	)
 	if err != nil {
-		logger.Error("Failed to generate tokens", zap.Error(err))
+		logger.Error("Failed to generate tokens", "error", err)
 		return nil, status.Error(codes.Internal, "Failed to generate tokens")
 	}
 
 	logger.Info("User authenticated successfully (gRPC)",
-		zap.String("email", user.Email),
-		zap.Int("user_id", user.ID),
+		"email", user.Email,
+		"user_id", user.ID,
 	)
 
 	// Publish authentication event to RabbitMQ
@@ -219,7 +218,7 @@ func (s *AuthServer) RefreshToken(ctx context.Context, req *pb.RefreshTokenReque
 func (app *Config) StartGRPCServer() error {
 	lis, err := net.Listen("tcp", ":50051")
 	if err != nil {
-		logger.Error("Failed to listen for gRPC", zap.Error(err))
+		logger.Error("Failed to listen for gRPC", "error", err)
 		return err
 	}
 
@@ -233,7 +232,7 @@ func (app *Config) StartGRPCServer() error {
 
 	pb.RegisterAuthServiceServer(grpcServer, authServer)
 
-	logger.Info("gRPC server started", zap.String("port", "50051"))
+	logger.Info("gRPC server started", "port", "50051")
 
 	return grpcServer.Serve(lis)
 }

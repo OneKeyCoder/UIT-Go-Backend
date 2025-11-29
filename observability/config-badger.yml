@@ -6,6 +6,14 @@ service:
       receivers: [otlp]
       processors: [batch]
       exporters: [jaeger_storage_exporter]
+    
+  
+  telemetry:
+    logs:
+      level: info
+    metrics:
+      level: detailed
+      address: 0.0.0.0:8888
 
 extensions:
   healthcheckv2:

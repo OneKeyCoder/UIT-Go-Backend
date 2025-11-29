@@ -8,7 +8,6 @@ import (
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/grpcutil"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/logger"
 	locationpb "github.com/OneKeyCoder/UIT-Go-Backend/proto/location"
-	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -24,12 +23,12 @@ func (grpcClients *GRPCClients) InitGRPCClients() (*GRPCClients, error) {
 		grpc.WithUnaryInterceptor(grpcutil.UnaryClientInterceptor()),
 	)
 	if err != nil {
-		logger.Error("Failed to connect to location service", zap.Error(err))
+		logger.Error("Failed to connect to location service", "error", err)
 		return nil, err
 	}
 
 	logger.Info("gRPC clients initialized",
-		zap.String("location_addr", "location-service:50053"),
+		"location_addr", "location-service:50053",
 	)
 	return &GRPCClients{
 		LocationClient: locationpb.NewLocationServiceClient(locationConn),
@@ -51,12 +50,12 @@ func (grpcClients *GRPCClients) SetLocationViaGRPC(ctx context.Context, userID i
 	}
 
 	logger.Info("Calling location service SetLocation via gRPC",
-		zap.String("user_id", strconv.Itoa(userID)),
+		"user_id", strconv.Itoa(userID),
 	)
 
 	resp, err := grpcClients.LocationClient.SetLocation(ctx, req)
 	if err != nil {
-		logger.Error("gRPC SetLocation failed", zap.Error(err))
+		logger.Error("gRPC SetLocation failed", "error", err)
 		return nil, err
 	}
 
@@ -73,12 +72,12 @@ func (grpcClients *GRPCClients) GetLocationViaGRPC(ctx context.Context, userID i
 	}
 
 	logger.Info("Calling location service GetLocation via gRPC",
-		zap.String("user_id", strconv.Itoa(userID)),
+		"user_id", strconv.Itoa(userID),
 	)
 
 	resp, err := grpcClients.LocationClient.GetLocation(ctx, req)
 	if err != nil {
-		logger.Error("gRPC GetLocation failed", zap.Error(err))
+		logger.Error("gRPC GetLocation failed", "error", err)
 		return nil, err
 	}
 
@@ -97,14 +96,14 @@ func (grpcClients *GRPCClients) FindNearestUsersViaGRPC(ctx context.Context, use
 	}
 
 	logger.Info("Calling location service FindNearestUsers via gRPC",
-		zap.String("user_id", strconv.Itoa(userID)),
-		zap.Int32("top_n", topN),
-		zap.Float64("radius", radius),
+		"user_id", strconv.Itoa(userID),
+		"top_n", topN,
+		"radius", radius,
 	)
 
 	resp, err := grpcClients.LocationClient.FindNearestUsers(ctx, req)
 	if err != nil {
-		logger.Error("gRPC FindNearestUsers failed", zap.Error(err))
+		logger.Error("gRPC FindNearestUsers failed", "error", err)
 		return nil, err
 	}
 
@@ -122,7 +121,7 @@ func (grpcClients *GRPCClients) GetAllLocationsViaGRPC(ctx context.Context) (*lo
 
 	resp, err := grpcClients.LocationClient.GetAllLocations(ctx, req)
 	if err != nil {
-		logger.Error("gRPC GetAllLocations failed", zap.Error(err))
+		logger.Error("gRPC GetAllLocations failed", "error", err)
 		return nil, err
 	}
 

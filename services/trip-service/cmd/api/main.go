@@ -11,7 +11,6 @@ import (
 
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/logger"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/telemetry"
-	"go.uber.org/zap"
 )
 
 // "github.com/OneKeyCoder/UIT-Go-Backend/common/logger"
@@ -25,39 +24,43 @@ type Config struct {
 
 func main() {
 	var app Config
-	logger.InitDefault("trip-service")
-	defer logger.Sync()
-	logger.Info("Starting trip service")
+
+	// Initialize telemetry FIRST (sets up OTLP LoggerProvider)
 	shutdown, err := telemetry.InitTracer("trip-service", "1.0.0")
 	if err != nil {
-		logger.Error("Failed to initialize tracer", zap.Error(err))
+		// Use basic println since logger not initialized yet
+		fmt.Printf("Failed to initialize tracer: %v\n", err)
 	} else {
 		defer func() {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			if err := shutdown(ctx); err != nil {
-				logger.Error("Failed to shutdown tracer", zap.Error(err))
+				logger.Error("Failed to shutdown tracer", "error", err)
 			}
 		}()
 	}
+
+	// Initialize logger AFTER telemetry (to pick up OTLP provider)
+	logger.InitDefault("trip-service")
+	logger.Info("Starting trip service")
 	service := TripService{}
 	service.InitializeServices()
 	app.TripService = &service
 	defer app.TripService.DB.Connection().Close()
 	defer func() {
 		if err := app.TripService.RabbitConn.Close(); err != nil {
-			logger.Error("Error closing RabbitMQ connection", zap.Error(err))
+			logger.Error("Error closing RabbitMQ connection", "error", err)
 		}
 	}()
 	go func() {
 		err := app.StartGRPCServer()
 		if err != nil {
-			logger.Fatal("gRPC server failed", zap.Error(err))
+			logger.Fatal("gRPC server failed", "error", err)
 		}
 	}()
 
 	logger.Info("Starting HTTP server",
-		zap.String("port", webPort),
+		"port", webPort,
 	)
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%s", webPort),
@@ -65,7 +68,7 @@ func main() {
 	}
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Fatal("Server failed", zap.Error(err))
+			logger.Fatal("Server failed", "error", err)
 		}
 	}()
 
@@ -79,7 +82,7 @@ func main() {
 	defer cancel()
 
 	if err := srv.Shutdown(ctx); err != nil {
-		logger.Error("Server forced to shutdown", zap.Error(err))
+		logger.Error("Server forced to shutdown", "error", err)
 	}
 
 	logger.Info("Server exited")

@@ -3,12 +3,33 @@ package middleware
 import (
 	"net/http"
 	"runtime/debug"
+	"strings"
 	"time"
 
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/logger"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/response"
-	"go.uber.org/zap"
 )
+
+// skipLogPaths are paths that should not be logged (health checks, metrics)
+var skipLogPaths = []string{
+	"/metrics",
+	"/health",
+	"/healthz",
+	"/ready",
+	"/readiness",
+	"/live",
+	"/liveness",
+}
+
+// shouldSkipLog returns true if the path should not be logged
+func shouldSkipLog(path string) bool {
+	for _, skip := range skipLogPaths {
+		if strings.HasPrefix(path, skip) {
+			return true
+		}
+	}
+	return false
+}
 
 // Logger middleware logs HTTP requests with structured logging
 func Logger(next http.Handler) http.Handler {
@@ -20,16 +41,41 @@ func Logger(next http.Handler) http.Handler {
 		
 		next.ServeHTTP(wrapped, r)
 		
+		if shouldSkipLog(r.URL.Path) {
+			return
+		}
+		
 		duration := time.Since(start)
 		
-		logger.Info("HTTP request",
-			zap.String("method", r.Method),
-			zap.String("path", r.RequestURI),
-			zap.Int("status", wrapped.statusCode),
-			zap.Duration("duration", duration),
-			zap.String("remote_addr", r.RemoteAddr),
-			zap.String("user_agent", r.UserAgent()),
-		)
+		// Log based on status code level
+		if wrapped.statusCode >= 500 {
+			logger.Error("HTTP request",
+				"method", r.Method,
+				"path", r.RequestURI,
+				"status", wrapped.statusCode,
+				"duration", duration,
+				"remote_addr", r.RemoteAddr,
+				"user_agent", r.UserAgent(),
+			)
+		} else if wrapped.statusCode >= 400 {
+			logger.Warn("HTTP request",
+				"method", r.Method,
+				"path", r.RequestURI,
+				"status", wrapped.statusCode,
+				"duration", duration,
+				"remote_addr", r.RemoteAddr,
+				"user_agent", r.UserAgent(),
+			)
+		} else {
+			logger.Info("HTTP request",
+				"method", r.Method,
+				"path", r.RequestURI,
+				"status", wrapped.statusCode,
+				"duration", duration,
+				"remote_addr", r.RemoteAddr,
+				"user_agent", r.UserAgent(),
+			)
+		}
 	})
 }
 
@@ -39,10 +85,10 @@ func Recovery(next http.Handler) http.Handler {
 		defer func() {
 			if err := recover(); err != nil {
 				logger.Error("Panic recovered",
-					zap.Any("error", err),
-					zap.String("stack", string(debug.Stack())),
-					zap.String("method", r.Method),
-					zap.String("path", r.RequestURI),
+					"error", err,
+					"stack", string(debug.Stack()),
+					"method", r.Method,
+					"path", r.RequestURI,
 				)
 				response.InternalServerError(w, "Internal server error")
 			}

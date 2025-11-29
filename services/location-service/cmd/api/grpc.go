@@ -12,7 +12,6 @@ import (
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/logger"
 	pb "github.com/OneKeyCoder/UIT-Go-Backend/proto/location"
 
-	"go.uber.org/zap"
 	"google.golang.org/grpc"
 )
 
@@ -24,7 +23,7 @@ type LocationServer struct {
 }
 
 func (s *LocationServer) SetLocation(ctx context.Context, req *pb.SetLocationRequest) (*pb.SetLocationResponse, error) {
-	logger.Info("gRPC SetLocation called", zap.String("user_id", strconv.Itoa(int(req.UserId))))
+	logger.Info("gRPC SetLocation called", "user_id", strconv.Itoa(int(req.UserId)))
 
 	location := &location_service.CurrentLocation{
 		UserID:    int(req.UserId),
@@ -38,7 +37,7 @@ func (s *LocationServer) SetLocation(ctx context.Context, req *pb.SetLocationReq
 
 	err := s.service.SetCurrentLocation(ctx, location)
 	if err != nil {
-		logger.Error("Failed to set location", zap.Error(err))
+		logger.Error("Failed to set location", "error", err)
 		return &pb.SetLocationResponse{
 			Success: false,
 			Message: err.Error(),
@@ -61,11 +60,11 @@ func (s *LocationServer) SetLocation(ctx context.Context, req *pb.SetLocationReq
 }
 
 func (s *LocationServer) GetLocation(ctx context.Context, req *pb.GetLocationRequest) (*pb.GetLocationResponse, error) {
-	logger.Info("gRPC GetLocation called", zap.String("user_id", strconv.Itoa(int(req.UserId))))
+	logger.Info("gRPC GetLocation called", "user_id", strconv.Itoa(int(req.UserId)))
 
 	location, err := s.service.GetCurrentLocation(ctx, int(req.UserId))
 	if err != nil {
-		logger.Error("Failed to get location", zap.Error(err))
+		logger.Error("Failed to get location", "error", err)
 		return &pb.GetLocationResponse{
 			Success: false,
 			Message: err.Error(),
@@ -97,9 +96,9 @@ func (s *LocationServer) GetLocation(ctx context.Context, req *pb.GetLocationReq
 
 func (s *LocationServer) FindNearestUsers(ctx context.Context, req *pb.FindNearestUsersRequest) (*pb.FindNearestUsersResponse, error) {
 	logger.Info("gRPC FindNearestUsers called",
-		zap.String("user_id", strconv.Itoa(int(req.UserId))),
-		zap.Int32("top_n", req.TopN),
-		zap.Float64("radius", req.Radius))
+		"user_id", strconv.Itoa(int(req.UserId)),
+		"top_n", req.TopN,
+		"radius", req.Radius)
 
 	topN := int(req.TopN)
 	if topN <= 0 {
@@ -113,7 +112,7 @@ func (s *LocationServer) FindNearestUsers(ctx context.Context, req *pb.FindNeare
 
 	locations, err := s.service.FindTopNearestUsers(ctx, int(req.UserId), topN, radius)
 	if err != nil {
-		logger.Error("Failed to find nearest users", zap.Error(err))
+		logger.Error("Failed to find nearest users", "error", err)
 		return &pb.FindNearestUsersResponse{
 			Success: false,
 			Message: err.Error(),
@@ -146,7 +145,7 @@ func (s *LocationServer) GetAllLocations(ctx context.Context, req *pb.GetAllLoca
 
 	locations, err := s.service.GetAllLocations(ctx)
 	if err != nil {
-		logger.Error("Failed to get all locations", zap.Error(err))
+		logger.Error("Failed to get all locations", "error", err)
 		return &pb.GetAllLocationsResponse{
 			Success: false,
 			Message: err.Error(),
@@ -176,7 +175,7 @@ func (s *LocationServer) GetAllLocations(ctx context.Context, req *pb.GetAllLoca
 func startGRPCServer(locationService *location_service.LocationService) {
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%s", grpcPort))
 	if err != nil {
-		logger.Fatal("Failed to listen for gRPC", zap.Error(err))
+		logger.Fatal("Failed to listen for gRPC", "error", err)
 	}
 
 	s := grpc.NewServer(
@@ -187,9 +186,9 @@ func startGRPCServer(locationService *location_service.LocationService) {
 		service: locationService,
 	})
 
-	logger.Info("Starting gRPC server", zap.String("port", grpcPort))
+	logger.Info("Starting gRPC server", "port", grpcPort)
 
 	if err := s.Serve(lis); err != nil {
-		logger.Fatal("Failed to serve gRPC", zap.Error(err))
+		logger.Fatal("Failed to serve gRPC", "error", err)
 	}
 }

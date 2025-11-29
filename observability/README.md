@@ -4,12 +4,13 @@
 
 Stack observability hoàn chỉnh cho hệ thống UIT-Go ride-sharing, bao gồm 3 trụ cột của observability:
 
-| Pillar | Tool | Port | Mục đích |
-|--------|------|------|----------|
-| **Metrics** | Prometheus | 9090 | Thu thập và lưu trữ metrics từ các services |
-| **Logs** | Loki + Promtail | 3100 | Centralized logging với label-based indexing |
-| **Traces** | Jaeger | 16686 | Distributed tracing qua nhiều microservices |
-| **Visualization** | Grafana | 3000 | Dashboard, alerts, và correlation giữa 3 pillars |
+| Pillar            | Tool          | Port      | Mục đích                                         |
+| ----------------- | ------------- | --------- | ------------------------------------------------ |
+| **Metrics**       | Prometheus    | 9090      | Thu thập và lưu trữ metrics từ các services      |
+| **Logs**          | Loki + Alloy  | 3100      | Centralized logging với label-based indexing     |
+| **Traces**        | Jaeger        | 16686     | Distributed tracing qua nhiều microservices      |
+| **Collector**     | Grafana Alloy | 4317/4318 | OTLP collector thay thế Promtail                 |
+| **Visualization** | Grafana       | 3000      | Dashboard, alerts, và correlation giữa 3 pillars |
 
 ## Kiến trúc
 
@@ -26,46 +27,63 @@ Stack observability hoàn chỉnh cho hệ thống UIT-Go ride-sharing, bao gồ
         │    (9090)       │  │    (3100)     │  │  (16686)  │
         │                 │  │               │  │           │
         │  - Metrics      │  │  - Logs       │  │  - Traces │
-        │  - Alerts       │  │  - Labels     │  │  - Spans  │
-        │  - Rules        │  │  - LogQL      │  │  - Badger │
+        │  - Remote Write │  │  - OTLP /otlp │  │  - Spans  │
+        │  - Alerts       │  │  - LogQL      │  │  - Badger │
         └────────┬────────┘  └───────┬───────┘  └─────┬─────┘
+                 ▲                   ▲                ▲
                  │                   │                │
-                 │           ┌───────▼───────┐        │
-                 │           │   Promtail    │        │
-                 │           │ (Log shipper) │        │
-                 │           └───────┬───────┘        │
-                 │                   │                │
-        ┌────────▼───────────────────▼────────────────▼────────┐
+           ┌─────┴───────────────────┴────────────────┴─────┐
+           │                 Grafana Alloy                   │
+           │              (OTLP Collector)                   │
+           │   ┌─────────────────────────────────────────┐  │
+           │   │  OTLP Receiver (4317 gRPC / 4318 HTTP)  │  │
+           │   └─────────────────────────────────────────┘  │
+           │   ┌─────────────────────────────────────────┐  │
+           │   │  Docker Log Scraper (Promtail-like)     │  │
+           │   └─────────────────────────────────────────┘  │
+           └───────────────────────┬────────────────────────┘
+                                   │
+        ┌──────────────────────────▼───────────────────────────┐
         │                    Go Services                        │
         │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐   │
         │  │ API Gateway │  │ Auth Svc    │  │ Trip Svc    │   │
-        │  │ /metrics    │  │ /metrics    │  │ /metrics    │   │
-        │  │ stdout logs │  │ stdout logs │  │ stdout logs │   │
         │  │ OTLP traces │  │ OTLP traces │  │ OTLP traces │   │
+        │  │ OTLP metrics│  │ OTLP metrics│  │ OTLP metrics│   │
+        │  │ stdout logs │  │ stdout logs │  │ stdout logs │   │
         │  └─────────────┘  └─────────────┘  └─────────────┘   │
         └──────────────────────────────────────────────────────┘
 ```
 
+## Data Flow
+
+1. **Traces**: Services → OTLP (4317) → Alloy → Jaeger
+2. **Metrics**: Services → OTLP (4317) → Alloy → Prometheus (remote write)
+3. **Logs** (Option A - OTLP): Services → OTLP (4317) → Alloy → Loki (/otlp)
+4. **Logs** (Option B - Docker): Docker stdout → Alloy → Loki (push API)
+
 ## SLOs/SLIs được định nghĩa
 
 ### API Gateway
-| SLI | SLO | Error Budget |
-|-----|-----|--------------|
-| Availability (non-5xx) | 99.9% | 43.2 min/month |
-| P95 Latency | < 500ms | - |
-| P99 Latency | < 1s | - |
+
+| SLI                    | SLO     | Error Budget   |
+| ---------------------- | ------- | -------------- |
+| Availability (non-5xx) | 99.9%   | 43.2 min/month |
+| P95 Latency            | < 500ms | -              |
+| P99 Latency            | < 1s    | -              |
 
 ### Trip Service (Business Critical)
-| SLI | SLO | Error Budget |
-|-----|-----|--------------|
-| Trip Booking Success Rate | 99.9% | 43.2 min/month |
-| Driver Search P95 Latency | < 200ms | - |
+
+| SLI                       | SLO     | Error Budget   |
+| ------------------------- | ------- | -------------- |
+| Trip Booking Success Rate | 99.9%   | 43.2 min/month |
+| Driver Search P95 Latency | < 200ms | -              |
 
 ### Authentication Service
-| SLI | SLO | Error Budget |
-|-----|-----|--------------|
-| Auth Success Rate | 99.95% | 21.6 min/month |
-| P95 Latency | < 100ms | - |
+
+| SLI               | SLO     | Error Budget   |
+| ----------------- | ------- | -------------- |
+| Auth Success Rate | 99.95%  | 21.6 min/month |
+| P95 Latency       | < 100ms | -              |
 
 ## Cách sử dụng
 
@@ -81,14 +99,15 @@ docker compose ps
 
 ### 2. Truy cập các tools
 
-- **Grafana**: http://localhost:3000 (admin/admin)
-- **Prometheus**: http://localhost:9090
-- **Jaeger UI**: http://localhost:16686
-- **Loki**: http://localhost:3100 (thường truy cập qua Grafana)
+-   **Grafana**: http://localhost:3000 (admin/admin)
+-   **Prometheus**: http://localhost:9090
+-   **Jaeger UI**: http://localhost:16686
+-   **Loki**: http://localhost:3100 (thường truy cập qua Grafana)
 
 ### 3. Demo flow Observability
 
 #### a) Tạo traffic
+
 ```bash
 # Login để tạo traces
 curl -X POST http://localhost:8080/grpc/auth \
@@ -104,18 +123,21 @@ curl -X POST http://localhost:8080/trip \
 ```
 
 #### b) Xem traces trong Jaeger
+
 1. Mở http://localhost:16686
 2. Chọn Service: `api-gateway` hoặc `trip-service`
 3. Click "Find Traces"
 4. Click vào một trace để xem chi tiết spans
 
 #### c) Correlate logs với traces
+
 1. Trong Jaeger, copy `traceID` từ một trace
 2. Mở Grafana → Explore → chọn Loki
 3. Query: `{service="api-gateway"} |= "<traceID>"`
 4. Hoặc click "View Logs" từ trace (nếu được cấu hình)
 
 #### d) Xem SLO dashboard
+
 1. Mở Grafana → Dashboards → UIT-Go
 2. Chọn "UIT-Go SLO/SLI Dashboard"
 3. Xem Error Budget, latency percentiles, request rates
@@ -123,43 +145,48 @@ curl -X POST http://localhost:8080/trip \
 ## Cấu hình chi tiết
 
 ### Prometheus
-- **File**: `prometheus.yml`
-- **Alerts**: `prometheus-alerts.yml`
-- **Retention**: 15 ngày
-- **Scrape interval**: 15s
+
+-   **File**: `prometheus.yml`
+-   **Alerts**: `prometheus-alerts.yml`
+-   **Retention**: 15 ngày
+-   **Scrape interval**: 15s
 
 ### Loki
-- **File**: `loki-config.yml`
-- **Retention**: 7 ngày (168h)
-- **Storage**: Local filesystem (`/loki`)
+
+-   **File**: `loki-config.yml`
+-   **Retention**: 7 ngày (168h)
+-   **Storage**: Local filesystem (`/loki`)
 
 ### Jaeger
-- **Storage**: Badger (embedded key-value store)
-- **Retention**: 7 ngày
-- **Protocol**: OTLP gRPC (port 4317)
+
+-   **Storage**: Badger (embedded key-value store)
+-   **Retention**: 7 ngày
+-   **Protocol**: OTLP gRPC (port 4317)
 
 ### Promtail
-- **File**: `promtail-config.yml`
-- **Source**: Docker socket (đọc logs từ containers)
-- **Labels extracted**: service, level, trace_id
+
+-   **File**: `promtail-config.yml`
+-   **Source**: Docker socket (đọc logs từ containers)
+-   **Labels extracted**: service, level, trace_id
 
 ## Alert Rules
 
 Các alerts được định nghĩa trong `prometheus-alerts.yml`:
 
-| Alert | Severity | Condition |
-|-------|----------|-----------|
-| SLO_HighErrorRate_FastBurn | critical | Error rate > 14.4x SLO trong 1h |
-| SLO_HighErrorRate_SlowBurn | warning | Error rate > 3x SLO trong 6h |
-| SLO_ErrorBudgetLow | critical | Error budget < 20% |
-| SLO_HighLatency_APIGateway | warning | P95 > 500ms trong 5m |
-| SLO_HighLatency_DriverSearch | warning | P95 > 200ms trong 5m |
-| ServiceDown | critical | Service unreachable > 1m |
-| HighTripBookingFailureRate | critical | Trip booking errors > 1% |
+| Alert                        | Severity | Condition                       |
+| ---------------------------- | -------- | ------------------------------- |
+| SLO_HighErrorRate_FastBurn   | critical | Error rate > 14.4x SLO trong 1h |
+| SLO_HighErrorRate_SlowBurn   | warning  | Error rate > 3x SLO trong 6h    |
+| SLO_ErrorBudgetLow           | critical | Error budget < 20%              |
+| SLO_HighLatency_APIGateway   | warning  | P95 > 500ms trong 5m            |
+| SLO_HighLatency_DriverSearch | warning  | P95 > 200ms trong 5m            |
+| ServiceDown                  | critical | Service unreachable > 1m        |
+| HighTripBookingFailureRate   | critical | Trip booking errors > 1%        |
 
 ## Troubleshooting
 
 ### Loki không nhận logs
+
 ```bash
 # Kiểm tra Promtail
 docker logs uit-go-promtail-1
@@ -169,6 +196,7 @@ docker exec uit-go-promtail-1 ls -la /var/run/docker.sock
 ```
 
 ### Jaeger không hiển thị traces
+
 ```bash
 # Kiểm tra services có gửi traces không
 docker logs uit-go-api-gateway-1 | grep -i trace
@@ -178,6 +206,7 @@ docker logs uit-go-jaeger-1
 ```
 
 ### Grafana datasource lỗi
+
 ```bash
 # Test Prometheus
 curl http://localhost:9090/api/v1/query?query=up
@@ -192,16 +221,19 @@ curl http://localhost:16686/api/services
 ## Trade-offs & Decisions
 
 ### Tại sao chọn Loki thay vì ELK Stack?
-- **Pro**: Nhẹ hơn nhiều, không cần index full-text, tích hợp Grafana native
-- **Con**: Query chậm hơn cho full-text search, không mạnh bằng Elasticsearch cho log analytics
+
+-   **Pro**: Nhẹ hơn nhiều, không cần index full-text, tích hợp Grafana native
+-   **Con**: Query chậm hơn cho full-text search, không mạnh bằng Elasticsearch cho log analytics
 
 ### Tại sao dùng Badger storage cho Jaeger?
-- **Pro**: Zero-config, persistent, embedded, không cần Elasticsearch/Cassandra
-- **Con**: Không scale được như Cassandra, giới hạn storage trên single node
+
+-   **Pro**: Zero-config, persistent, embedded, không cần Elasticsearch/Cassandra
+-   **Con**: Không scale được như Cassandra, giới hạn storage trên single node
 
 ### Tại sao structured logging với JSON?
-- **Pro**: Machine-readable, dễ parse bởi Loki/Promtail, hỗ trợ correlation
-- **Con**: Không human-friendly khi đọc raw logs
+
+-   **Pro**: Machine-readable, dễ parse bởi Loki/Promtail, hỗ trợ correlation
+-   **Con**: Không human-friendly khi đọc raw logs
 
 ## Files trong thư mục này
 
@@ -226,8 +258,8 @@ infrastructure/observability/
 
 ## Tài liệu tham khảo
 
-- [OpenTelemetry Go SDK](https://opentelemetry.io/docs/languages/go/)
-- [Grafana Loki Documentation](https://grafana.com/docs/loki/latest/)
-- [Jaeger Documentation](https://www.jaegertracing.io/docs/)
-- [Prometheus Alerting Rules](https://prometheus.io/docs/prometheus/latest/configuration/alerting_rules/)
-- [Google SRE Book - SLOs](https://sre.google/sre-book/service-level-objectives/)
+-   [OpenTelemetry Go SDK](https://opentelemetry.io/docs/languages/go/)
+-   [Grafana Loki Documentation](https://grafana.com/docs/loki/latest/)
+-   [Jaeger Documentation](https://www.jaegertracing.io/docs/)
+-   [Prometheus Alerting Rules](https://prometheus.io/docs/prometheus/latest/configuration/alerting_rules/)
+-   [Google SRE Book - SLOs](https://sre.google/sre-book/service-level-objectives/)

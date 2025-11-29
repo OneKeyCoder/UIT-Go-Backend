@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/logger"
-	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -74,7 +73,7 @@ func (u *User) GetAll() ([]*User, error) {
 			&user.UpdatedAt,
 		)
 		if err != nil {
-			logger.Error("Error scanning user row", zap.Error(err))
+			logger.Error("Error scanning user row", "error", err)
 			return nil, err
 		}
 

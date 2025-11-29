@@ -17,7 +17,6 @@ import (
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/logger"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/rabbitmq"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/telemetry"
-	"go.uber.org/zap"
 )
 
 const webPort = "80"
@@ -29,33 +28,35 @@ type Config struct {
 var client *mongo.Client
 
 func main() {
-	logger.InitDefault("logger-service")
-	defer logger.Sync()
-	logger.Info("Starting logger service")
-
+	// Initialize telemetry FIRST (sets up OTLP LoggerProvider)
 	shutdown, err := telemetry.InitTracer("logger-service", "1.0.0")
 	if err != nil {
-		logger.Error("Failed to initialize tracer", zap.Error(err))
+		// Use basic println since logger not initialized yet
+		fmt.Printf("Failed to initialize tracer: %v\n", err)
 	} else {
 		defer func() {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			if err := shutdown(ctx); err != nil {
-				logger.Error("Failed to shutdown tracer", zap.Error(err))
+				logger.Error("Failed to shutdown tracer", "error", err)
 			}
 		}()
 	}
 
+	// Initialize logger AFTER telemetry (to pick up OTLP provider)
+	logger.InitDefault("logger-service")
+	logger.Info("Starting logger service")
+
 	mongoClient, err := connectToMongo()
 	if err != nil {
-		logger.Fatal("Failed to connect to MongoDB", zap.Error(err))
+		logger.Fatal("Failed to connect to MongoDB", "error", err)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	defer func() {
 		if err = mongoClient.Disconnect(ctx); err != nil {
-			logger.Error("Error disconnecting from MongoDB", zap.Error(err))
+			logger.Error("Error disconnecting from MongoDB", "error", err)
 		}
 	}()
 
@@ -68,21 +69,21 @@ func main() {
 	// Connect to RabbitMQ
 	rabbitConn, err := rabbitmq.ConnectSimple(env.RabbitMQURL())
 	if err != nil {
-		logger.Error("Failed to connect to RabbitMQ, continuing without consumer", zap.Error(err))
+		logger.Error("Failed to connect to RabbitMQ, continuing without consumer", "error", err)
 	} else {
 		logger.Info("Connected to RabbitMQ")
 		// Start RabbitMQ consumer in goroutine
 		go func() {
 			err := app.ConsumeFromRabbitMQ(rabbitConn)
 			if err != nil {
-				logger.Error("RabbitMQ consumer error", zap.Error(err))
+				logger.Error("RabbitMQ consumer error", "error", err)
 			}
 		}()
 		defer func() {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			if err := rabbitConn.Close(); err != nil {
-				logger.Error("Error closing RabbitMQ connection", zap.Error(err))
+				logger.Error("Error closing RabbitMQ connection", "error", err)
 			}
 			_ = ctx // avoid unused variable
 		}()
@@ -91,11 +92,11 @@ func main() {
 	go func() {
 		err := app.StartGRPCServer()
 		if err != nil {
-			logger.Fatal("gRPC server failed", zap.Error(err))
+			logger.Fatal("gRPC server failed", "error", err)
 		}
 	}()
 
-	logger.Info("Starting HTTP server", zap.String("port", webPort))
+	logger.Info("Starting HTTP server", "port", webPort)
 
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%s", webPort),
@@ -105,7 +106,7 @@ func main() {
 	// Start server in goroutine
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Fatal("Server failed", zap.Error(err))
+			logger.Fatal("Server failed", "error", err)
 		}
 	}()
 
@@ -121,7 +122,7 @@ func main() {
 	defer cancel()
 
 	if err := srv.Shutdown(ctx); err != nil {
-		logger.Error("Server forced to shutdown", zap.Error(err))
+		logger.Error("Server forced to shutdown", "error", err)
 	}
 
 	logger.Info("Server exited")
@@ -146,7 +147,7 @@ func connectToMongo() (*mongo.Client, error) {
 
 	c, err := mongo.Connect(context.TODO(), clientOptions)
 	if err != nil {
-		logger.Error("MongoDB connection failed", zap.Error(err))
+		logger.Error("MongoDB connection failed", "error", err)
 		return nil, err
 	}
 
