@@ -1,0 +1,24 @@
+name: Build and Deploy User service to ACA 
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'services/user-service/**'
+      - 'services/proto/**'
+      - 'services/common/**'
+  pull_request:
+    branches: [master]
+    paths:
+      - 'services/user-service/**'
+      - 'services/proto/**'
+      - 'services/common/**'
+
+
+jobs:
+  deploy-to-aca:
+    uses: ./.github/workflows/template.yaml
+    with:
+      app-name: user-service  ## cái này cũng thay bằng tên container app real nhé
+      dockerfile-path: user-service/user-service.dockerfile
+    secrets: inherit

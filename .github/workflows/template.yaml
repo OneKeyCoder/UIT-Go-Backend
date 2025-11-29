@@ -1,0 +1,44 @@
+name: Template for building and deploying to ACA
+
+on:
+  workflow_call:
+    inputs:
+      dockerfile-path:
+        required: true
+        type: string
+      app-name:
+        required: true
+        type: string
+    secrets:
+      AZURE_CREDENTIALS:
+        required: true
+      REGISTRY_USERNAME:
+        required: true
+      REGISTRY_PASSWORD:
+        required: true
+      
+
+jobs:
+  build-push-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: checkout repo
+        uses: actions/checkout@v4
+
+      - name: Log in to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Build and deploy Container App
+        uses: azure/container-apps-deploy-action@v1
+        with:
+          appSourcePath: ${{ github.workspace }}/services
+          acrName: testcipipeline ## thay bằng cái thực giúp
+          acrUsername: ${{ secrets.REGISTRY_USERNAME }}
+          resourceGroup: test-uit-go ## y chang
+          containerAppName: ${{ inputs.app-name }}
+          acrPassword: ${{ secrets.REGISTRY_PASSWORD }}
+          containerAppEnvironment: our-container-app-env ## nốt
+          dockerfilePath: ${{ inputs.dockerfile-path }}
