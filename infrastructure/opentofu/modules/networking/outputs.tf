@@ -13,3 +13,7 @@ output "dmz-subnet" {
 output "main-vnet" {
   value = azurerm_virtual_network.main
 }
+
+output "endpoints-subnet" {
+  value = azurerm_subnet.endpoints
+}

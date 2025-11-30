@@ -12,3 +12,12 @@ variable "location" {
   description = "Azure region for all resources"
   type        = string
 }
+
+variable "private_endpoint_subnet_id" {
+  description = "Subnet to install private endpoint to the key vault in"
+  type = string
+}
+
+variable "private_dns_zone_id" {
+  description = "Private DNS zone"
+}

@@ -8,6 +8,10 @@ terraform {
       source  = "hashicorp/azurerm"
       version = "~> 4.51.0"
     }
+    random = {
+      source = "hashicorp/random"
+      version = "3.7.2"
+    }
   }
 
   #! INFO: Configure remote state prior to first apply (Azure Storage backend recommended).

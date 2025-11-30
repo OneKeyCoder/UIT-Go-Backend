@@ -1,5 +1,5 @@
 # Subnet:
-# https://www.davidc.net/sites/default/subnets/subnets.html?network=192.168.0.0&mask=16&division=17.fb100
+# https://www.davidc.net/sites/default/subnets/subnets.html?network=192.168.0.0&mask=16&division=25.fb97000
 
 resource "azurerm_virtual_network" "main" {
   name = "${var.resource_prefix}-vnet"
@@ -12,6 +12,7 @@ resource "azurerm_subnet" "aca" {
   name = "subnet-aca"
   resource_group_name = var.resource_group_name
   virtual_network_name = azurerm_virtual_network.main.name
+  default_outbound_access_enabled = true
   address_prefixes = ["10.0.0.0/22"] # 1019 hosts (network and broadcast ip, and azure reserves additional 3 ips)
 
   delegation {
@@ -43,6 +44,27 @@ resource "azurerm_subnet" "postgres" {
       actions = ["Microsoft.Network/virtualNetworks/subnets/action"]
     }
   }
+}
+
+# special subnet for private endpoints
+resource "azurerm_subnet" "endpoints" {
+  name                 = "subnet-endpoints"
+  resource_group_name  = var.resource_group_name
+  virtual_network_name = azurerm_virtual_network.main.name
+  address_prefixes     = ["10.0.6.0/27"]
+  
+  private_endpoint_network_policies = "Disabled" 
+}
+# Key Vault Private Links
+resource "azurerm_private_dns_zone" "kv" {
+  name                = "privatelink.vaultcore.azure.net"
+  resource_group_name = var.resource_group_name
+}
+resource "azurerm_private_dns_zone_virtual_network_link" "kv_link" {
+  name                  = "kv-link"
+  resource_group_name   = var.resource_group_name
+  private_dns_zone_name = azurerm_private_dns_zone.kv.name
+  virtual_network_id    = azurerm_virtual_network.main.id
 }
 
 # acls

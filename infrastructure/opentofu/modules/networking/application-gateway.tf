@@ -11,7 +11,7 @@ resource "azurerm_application_gateway" "app_gw" {
     max_capacity = 50
   }
   backend_address_pool {
-
+    
   }
   backend_http_settings {
 
