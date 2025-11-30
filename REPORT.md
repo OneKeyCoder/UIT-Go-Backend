@@ -10,6 +10,8 @@ Aside from these, most of the concepts should be similar or have a competitor al
 
 Keep in mind, generally Azure is more invested in their own MS SQL Server and Document DB services, while AWS is more invested in MySQL, PostgreSQL so hyperscale service offerings between 2 companies in these areas might differ.
 
+And we also uses `opentofu` instead of `terraform` for IaC because licensing and Linux Foundation backing. However, there should be no difference running our tf project with both tools. Locally I symlinked `terraform` to `tofu` and everything works fine.
+
 ## App diagram - dev's story
 
 We have the following services in our app skeleton:
@@ -114,6 +116,41 @@ The project will primarily do Module D and E:
 ### Automation - CI/CD
 
 **GitHub Actions** is used as the CI/CD platform, simply because CI/CD itself is just a task runner that run a shell script when a webhook is triggered, usually through Git repo push actions to a branch. Since the project is already hosted on GitHub, GitHub Actions is easy to add. It allows custom runner too, so no dependent costs, and can migrate easily anytime since it's just CI/CD.
+
+Each services (a folder in the `services` folder) that need to be deployed will have its own pipeline defined. If any files in and only in that folder changes, it will trigger a build run, which `docker build` that image, then pushes to ACR, then trigger updates in ACA to create a new revision with `azure-cli`.
+
+A revision is like an app update, config update or similar that doesn't change underlying infrastructure. Usually it's used to update our apps, like in this case, or even do A/B testing or multiple API versions, etc.
+
+Rolling updates will be automatically done on revision change by ACA (it's just K8s) so no service disruption.
+
+### Automation - IaC OpenTofu modules
+
+The IaC codebase is splitted into modules for easier re-use, and structured in industry best practice.
+
+We have (at least) these modules:
+- networking: vnets, acls, dns,...
+- aca-infra: define ACR, ACA environments,...
+- aca-service: create an ACA service that runs inside ACA environment created with `aca-infra`
+- postgres
+- redis
+- resource-group
+- azure-files
+- service-bus
+- key-vault
+- documentdb
+- app-gw
+
+Then combined in the top-level module `main.tf`.
+
+In case a new service is added, just add a new block of module `aca-service` into the top-level module with configs for it.
+
+We do have the problem of chicken-and-egg when provisioning ACR and ACA, since ACR is newly-deployed, and have no images on it yet, but ACA needs a pullable image to provision, so this would fails.
+
+https://www.mytechramblings.com/posts/how-to-push-a-container-image-into-acr-using-te
+
+We picked the build-inline option, which involves using `null_resource` to trigger a shell command to use `az acr build` to build the images and pushes to ACR after creating the ACR but before creating ACA so that it has a valid image.
+
+This is hacky, but the other option is to use a dummy image and update later with CI/CD, which can overwrite when we do `tf apply` so in my opinion even more hacky. This is the state of Terraform. This is not a good state. But what can we do?
 
 ### Cost calculation and optimization
 We used the **Azure Pricing Calculator** to estimate our monthly costs.
