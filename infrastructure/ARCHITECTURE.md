@@ -1,4 +1,4 @@
-# dm cloud
+# cloud
 
 MS docs are starting to be written by AI. Be careful.
 
@@ -85,7 +85,3 @@ Azure Key Vault.
 Then connect to ACA to provide the secrets.
 
 No need for alternatives. But if you insist, bitnami sealed secrets, and other key vaults.
-
-## Grafana and friends
-
-## 

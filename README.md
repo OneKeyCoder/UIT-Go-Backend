@@ -8,7 +8,7 @@ A non-modern, maybe-scalable microservices backend built with Go. Should support
 
 ## Repo structure
 
-Currently do NOT support per-service deployment.
+Currently support per-service deployment in GitHub Actions.
 
 Each service will have a folder inside `service` folder:
 
@@ -72,8 +72,33 @@ Read more:
 - https://www.redhat.com/en/blog/debug-rootless-podman-mounted-volumes
 - https://stackoverflow.com/questions/79173758/podman-volume-mount-permissions-issues
 
+## Instructions for deploying
+
+There will be a `infrastructure` folder containing deployment files.
+
+First, to deploy the infrastructure, install `azure-cli` on your machine. Then, login with `az login`.
+
+After that, install either `terraform` or `opentofu`.
+From the `opentofu` folder, first create a `.tfvars` file containing all the needed variables. There will be an example file showing needed vars.
+
+Also, to store tfstate remotely, make a storage account then put the details inside tfvars too.
+
+Then, just run:
+
+```bash
+tofu init
+tofu plan
+tofu apply
+```
+
+This will create an ACR, build the apps with it, then use it to create the ACA. Chicken-and-egg problem.
+
+[more info][acr and aca problem]
+
+There should be a GitHub Actions pipeline in this repo to handle the rest (CI/CD)
+
 ## Footnote
 
 Entire deploy flow is made without or with minimal LLM footprint. *All mistakes are my own.*
 
-!TODO finish this
+[acr and aca problem]: https://www.mytechramblings.com/posts/how-to-push-a-container-image-into-acr-using-terraform/
