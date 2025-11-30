@@ -1,0 +1,3 @@
+# Persistent storage - Azure Files
+
+This is a no-brainer. ACA provides only 3 volume mount options, 2 of which is ephemeral, so we have to use the third and only persistent option - Azure Files - to save data for services like Grafana, Prometheus,...
