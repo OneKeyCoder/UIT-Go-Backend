@@ -1,5 +1,16 @@
 # Final ~~duet~~ report
 
+This is the report for the course SE360.Q11's project.
+
+## Members
+
+- 23520923: Hồ Nguyên Minh
+- 23520906: Hứa Văn Lý
+- 23520950: Phan Đức Minh
+- 23520949: Phan Đình Minh
+
+## Project disclaimers
+
 Heads-up: We uses Azure instead of AWS to:
 
 1. explore our options
