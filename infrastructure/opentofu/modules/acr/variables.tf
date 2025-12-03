@@ -12,3 +12,12 @@ variable "location" {
   description = "Azure region of resource group"
   type        = string
 }
+
+variable "sku" {
+  description = "Service tier to use"
+  type = string
+  validation {
+    condition = contains(["Basic", "Premium", "Standard"], var.sku)
+    error_message = "Invalid SKU, valid values is: Basic, Premium, Standard"
+  }
+}
