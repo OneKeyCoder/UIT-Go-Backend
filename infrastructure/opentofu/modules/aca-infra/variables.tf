@@ -20,3 +20,7 @@ variable "vnet_id" {
 variable "subnet_id" {
   type = string
 }
+
+variable "acr_pull_identity_id" {
+  type = string
+}

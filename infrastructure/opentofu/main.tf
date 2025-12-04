@@ -67,6 +67,8 @@ module "aca-infra" {
 
   vnet_id = module.networking.main-vnet-id
   subnet_id = module.networking.aca-subnet-id
+
+  acr_pull_identity_id = module.acr.acr_pull_identity_id
 }
 
 locals {
@@ -129,4 +131,3 @@ module "files-mount" {
   allowed_subnet_ids = [module.networking.aca-subnet-id]
   key_vault_id = module.key_vault.id
 }
-

@@ -24,6 +24,11 @@ resource "azurerm_container_app_environment" "env" {
     minimum_count         = 1    # Always keep 1 node running
     maximum_count         = 3
   }
+
+  identity {
+    type = "SystemAssigned, UserAssigned"
+    identity_ids = [var.acr_pull_identity_id]
+  }
 }
 
 # Private DNS Zone for App gateway
