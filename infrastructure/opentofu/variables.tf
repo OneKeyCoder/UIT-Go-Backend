@@ -24,3 +24,16 @@ variable "postgres_admin_password" {
   type = string
   sensitive = true
 }
+
+variable "base_hostname" {
+  type = string
+}
+
+variable "pfx_ssl_filename" {
+  type = string
+}
+
+variable "pfx_ssl_password" {
+  type = string
+  sensitive = true
+}

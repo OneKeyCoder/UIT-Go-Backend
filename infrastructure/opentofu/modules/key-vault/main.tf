@@ -35,13 +35,10 @@ resource "azurerm_key_vault" "keyvault" {
   soft_delete_retention_days  = 7
   purge_protection_enabled    = false
 
+  # only allow service endpoints
   network_acls {
     bypass = "AzureServices"
     default_action = "Deny"
     virtual_network_subnet_ids = var.allowed_subnet_ids
   }
-}
-
-resource "azurerm_key_vault_key" "a" {
-  
 }

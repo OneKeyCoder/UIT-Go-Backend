@@ -17,7 +17,7 @@ variable "subnet_id" {
   description = "Subnet ID to create resource in. Must not contain any other resource."
   type        = string
 }
-variable "base_host_name" {
+variable "base_hostname" {
   description = "Base host name to use for AppGW, where a subdomain will be prepended for each endpoint"
   type        = string
 }
@@ -32,11 +32,11 @@ variable "api_subdomain" {
   type        = string
 }
 
-variable "grafana_aca_fqdn" {
+variable "monitor_aca_fqdn" {
   description = "FQDN of target Grafana ACA (target app, not environment)"
   type        = string
 }
-variable "grafana_subdomain" {
+variable "monitor_subdomain" {
   description = "Subdomain of the api endpoint."
   default     = "monitor"
   type        = string

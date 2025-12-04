@@ -10,11 +10,12 @@ locals {
   https_port = "https-port"
   ssl_cert = "ssl-cert"
   api_hostname = (var.api_subdomain == "" || var.api_subdomain == null
-    ? var.base_host_name
-    : "${var.api_subdomain}.${var.base_host_name}")
-  monitor_hostname = (var.grafana_subdomain == "" || var.grafana_subdomain == null
-    ? var.base_host_name
-    : "${var.grafana_subdomain}.${var.base_host_name}")
+    ? var.base_hostname
+    : "${var.api_subdomain}.${var.base_hostname}")
+  monitor_hostname = (var.monitor_subdomain == "" || var.monitor_subdomain == null
+    ? var.base_hostname
+    : "${var.monitor_subdomain}.${var.base_hostname}")
+  preserve_host_ruleset = "preserve-host-header"
 }
 
 resource "azurerm_application_gateway" "app_gw" {
@@ -61,6 +62,19 @@ resource "azurerm_application_gateway" "app_gw" {
     password = var.pfx_ssl_password
   }
 
+  # Keep Host header rule
+  rewrite_rule_set {
+    name = local.preserve_host_ruleset
+    rewrite_rule {
+      name = "preserve-host-header-rule"
+      request_header_configuration {
+        header_name = "X-Forwarded-Host"
+        header_value = "{http_req_host}"
+      }
+      rule_sequence = 1
+    }
+  }
+
   # api endpoint
   backend_address_pool {
     name = "api-pool"
@@ -78,12 +92,13 @@ resource "azurerm_application_gateway" "app_gw" {
     name = "api-routing"
     rule_type = "Basic"
     http_listener_name = "api-listener"
+    rewrite_rule_set_name = local.preserve_host_ruleset
   }
 
   # monitor endpoint
   backend_address_pool {
     name = "grafana-pool"
-    fqdns = [var.grafana_aca_fqdn]
+    fqdns = [var.monitor_aca_fqdn]
   }
   http_listener {
     name = "monitor-listener"
@@ -97,5 +112,6 @@ resource "azurerm_application_gateway" "app_gw" {
     name = "monitor-routing"
     rule_type = "Basic"
     http_listener_name = "monitor-listener"
+    rewrite_rule_set_name = local.preserve_host_ruleset
   }
 }

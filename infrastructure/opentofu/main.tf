@@ -69,3 +69,41 @@ module "aca-infra" {
   subnet_id = module.networking.aca-subnet-id
 }
 
+locals {
+  api_internal_hostname = "api-gateway"
+  monitor_internal_hostname = "grafana"
+}
+
+module "app-gw" {
+  source = "./modules/app-gw"
+  
+  resource_prefix = var.resource_prefix
+  resource_group_name = local.rg_name
+  location = local.rg_location
+
+  subnet_id = module.networking.dmz-subnet-id
+  base_hostname = var.base_hostname
+
+  api_aca_fqdn = "${local.api_internal_hostname}.${module.aca-infra.env-fdns}"
+  monitor_aca_fqdn = "${local.monitor_internal_hostname}.${module.aca-infra.env-fdns}"
+
+  pfx_ssl_filename = var.pfx_ssl_filename
+  pfx_ssl_password = var.pfx_ssl_password
+}
+
+module "location-redis" {
+  source = "./modules/redis"
+
+  resource_prefix = "${var.resource_prefix}-location"
+  resource_group_name = local.rg_name
+  location = local.rg_location
+
+  endpoint_subnet_id = module.networking.endpoints-subnet-id
+  endpoint_dns_zone_id = module.networking.redis-dns-zone-id
+
+  key_vault_id = module.key_vault.id
+  tags = {
+    "service": "location"
+  }
+}
+
