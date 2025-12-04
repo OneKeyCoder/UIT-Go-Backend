@@ -107,3 +107,15 @@ module "location-redis" {
   }
 }
 
+module "documentdb" {
+  source = "./modules/documentdb"
+
+  resource_prefix = var.resource_prefix
+  resource_group_name = local.rg_name
+  location = local.rg_location
+
+  admin_username = var.documentdb_admin_username
+  admin_password = var.documentdb_admin_password
+  storage_size_in_gb = 32
+}
+

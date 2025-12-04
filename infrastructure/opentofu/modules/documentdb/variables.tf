@@ -12,3 +12,27 @@ variable "location" {
   description = "Azure region for all resources"
   type        = string
 }
+
+variable "admin_username" {
+  type = string
+}
+
+variable "admin_password" {
+  type = string
+  sensitive = true
+}
+
+variable "compute_tier" {
+  type = string
+  default = "M30"
+}
+
+variable "storage_size_in_gb" {
+  type = number
+  default = 128
+}
+
+variable "tags" {
+  type = map(string)
+  default = {}
+}

@@ -41,3 +41,11 @@ variable "pfx_ssl_password" {
   type = string
   sensitive = true
 }
+
+variable "documentdb_admin_username" {
+  type = string
+}
+variable "documentdb_admin_password" {
+  type = string
+  sensitive = true
+}
