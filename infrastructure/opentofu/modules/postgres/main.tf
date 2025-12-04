@@ -20,9 +20,11 @@ resource "azurerm_postgresql_flexible_server" "postgres" {
 
   delegated_subnet_id = var.subnet_id
   private_dns_zone_id = azurerm_private_dns_zone.postgres.id
+  public_network_access_enabled = false
 
   administrator_login    = var.admin_username
-  administrator_password = var.admin_password
+  administrator_password_wo = var.admin_password
+  administrator_password_wo_version = var.admin_password_version
 
   storage_mb = 131072 # 128GB
   storage_tier = "P30"

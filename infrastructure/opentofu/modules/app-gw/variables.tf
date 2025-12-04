@@ -54,5 +54,4 @@ variable "pfx_ssl_password" {
   description = "Password for the pfx SSL file"
   type        = string
   sensitive = true
-  ephemeral = true
 }

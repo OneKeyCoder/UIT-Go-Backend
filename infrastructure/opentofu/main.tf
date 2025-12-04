@@ -4,7 +4,6 @@ module "resource-group" {
   source = "./modules/resource-group"
 
   resource_group_base_name = var.resource_prefix
-  environment = var.environment
   location = var.location
 }
 
@@ -18,7 +17,7 @@ module "acr" {
 
   resource_group_name = local.rg_name
   location = local.rg_location
-  resource_prefix = var.resource_prefix
+  name = var.acr_name
 }
 
 # First time deploy will stop here. Run CD pipeline once then continue the deploy.
@@ -44,6 +43,7 @@ module "postgres" {
   # TODO: swap this out for a randomized per-db password.
   admin_username = var.postgres_admin_username
   admin_password = var.postgres_admin_password
+  admin_password_version = var.postgres_admin_password_version
 }
 
 module "key_vault" {

@@ -1,12 +1,3 @@
-provider "azurerm" {
-  features {
-    key_vault {
-      purge_soft_delete_on_destroy    = true
-      recover_soft_deleted_key_vaults = true
-    }
-  }
-}
-
 data "azurerm_client_config" "current" {}
 
 # Role for ACA to access keyvaults
@@ -18,7 +9,7 @@ resource "azurerm_user_assigned_identity" "apps" {
 
 # random id
 resource "random_id" "random_keyvault_suffix" {
-  byte_length = 16
+  byte_length = 6
 }
 
 resource "azurerm_key_vault" "keyvault" {

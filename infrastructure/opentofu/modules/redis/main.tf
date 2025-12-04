@@ -1,10 +1,10 @@
 # random id for unique name
 resource "random_id" "random_keyvault_suffix" {
-  byte_length = 16
+  byte_length = 6
 }
 
 resource "azurerm_managed_redis" "redis" {
-  name = "${var.resource_prefix}-${random_id}-redis"
+  name = "${var.resource_prefix}-${random_id.random_keyvault_suffix.hex}-redis"
   resource_group_name = var.resource_group_name
   location = var.location
   sku_name = var.sku_name

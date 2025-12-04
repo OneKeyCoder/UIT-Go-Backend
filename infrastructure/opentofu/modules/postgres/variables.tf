@@ -29,14 +29,16 @@ variable "db_names" {
 
 variable "admin_username" {
   type = string
-  sensitive = true
-  ephemeral = true
 }
 
 variable "admin_password" {
   type = string
   sensitive = true
   ephemeral = true
+}
+
+variable "admin_password_version" {
+  type = number
 }
 
 variable "sku_name" {

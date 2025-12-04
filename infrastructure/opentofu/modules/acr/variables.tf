@@ -3,8 +3,8 @@ variable "resource_group_name" {
   type        = string
 }
 
-variable "resource_prefix" {
-  description = "Prefix of the name for the resources"
+variable "name" {
+  description = "Unique, alphanumeric-only name for the resource"
   type        = string
 }
 
