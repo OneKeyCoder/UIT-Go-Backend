@@ -36,3 +36,8 @@ variable "tags" {
   type = map(string)
   default = {}
 }
+
+variable "key_vault_id" {
+  description = "ID of the Key Vault to store connection string"
+  type        = string
+}

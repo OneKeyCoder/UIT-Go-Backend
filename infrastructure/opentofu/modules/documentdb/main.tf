@@ -21,3 +21,14 @@ resource "azurerm_mongo_cluster_firewall_rule" "azure_allow" {
   start_ip_address = "0.0.0.0"
   end_ip_address = "0.0.0.0"
 }
+
+# Store primary connection string in Key Vault
+resource "azurerm_key_vault_secret" "mongo_connection_string" {
+  name         = "${var.resource_prefix}-mongo-connection-string"
+  key_vault_id = var.key_vault_id
+  value        = length(azurerm_mongo_cluster.main.connection_strings) > 0 ? azurerm_mongo_cluster.main.connection_strings[0].value : ""
+  
+  lifecycle {
+    ignore_changes = [value]
+  }
+}

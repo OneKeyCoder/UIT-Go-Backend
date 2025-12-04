@@ -16,3 +16,8 @@ variable "location" {
 variable "aca_subnet_id" {
   type = string
 }
+
+variable "key_vault_id" {
+  description = "ID of the Key Vault to store connection string"
+  type        = string
+}

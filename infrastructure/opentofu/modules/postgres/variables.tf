@@ -34,7 +34,6 @@ variable "admin_username" {
 variable "admin_password" {
   type = string
   sensitive = true
-  ephemeral = true
 }
 
 variable "admin_password_version" {
@@ -45,4 +44,9 @@ variable "sku_name" {
   description = "Compute size SKU"
   type = string
   default = "GP_Standard_D4ads_v5"
+}
+
+variable "key_vault_id" {
+  description = "ID of the Key Vault to store connection string"
+  type        = string
 }

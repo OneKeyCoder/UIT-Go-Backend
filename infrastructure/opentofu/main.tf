@@ -44,6 +44,8 @@ module "postgres" {
   admin_username = var.postgres_admin_username
   admin_password = var.postgres_admin_password
   admin_password_version = var.postgres_admin_password_version
+  
+  key_vault_id = module.key_vault.id
 }
 
 module "key_vault" {
@@ -56,6 +58,10 @@ module "key_vault" {
   allowed_subnet_ids = [
     module.networking.aca-subnet-id,
   ]
+  
+  jwt_secret  = var.jwt_secret
+  here_id     = var.here_id
+  here_secret = var.here_secret
 }
 
 module "aca-infra" {
@@ -119,6 +125,8 @@ module "documentdb" {
   admin_username = var.documentdb_admin_username
   admin_password = var.documentdb_admin_password
   storage_size_in_gb = 32
+  
+  key_vault_id = module.key_vault.id
 }
 
 module "files-mount" {
@@ -130,4 +138,15 @@ module "files-mount" {
 
   allowed_subnet_ids = [module.networking.aca-subnet-id]
   key_vault_id = module.key_vault.id
+}
+
+module "service-bus" {
+  source = "./modules/service-bus"
+
+  resource_prefix     = var.resource_prefix
+  resource_group_name = local.rg_name
+  location            = local.rg_location
+  
+  aca_subnet_id = module.networking.aca-subnet-id
+  key_vault_id  = module.key_vault.id
 }

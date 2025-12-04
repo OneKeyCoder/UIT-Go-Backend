@@ -71,3 +71,12 @@ resource "azurerm_postgresql_flexible_server_database" "dbs" {
   collation = "en_US.utf8"
   charset   = "utf8"
 }
+
+# Store PostgreSQL connection string in Key Vault
+resource "azurerm_key_vault_secret" "postgres_connection_string" {
+  name         = "${var.resource_prefix}-postgres-connection-string"
+  key_vault_id = var.key_vault_id
+  value        = "host=${azurerm_postgresql_flexible_server.postgres.fqdn} port=5432 user=${var.admin_username} password=${var.admin_password} dbname=users sslmode=require timezone=UTC connect_timeout=5"
+  
+  depends_on = [azurerm_postgresql_flexible_server_database.dbs]
+}

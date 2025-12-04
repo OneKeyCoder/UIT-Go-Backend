@@ -49,3 +49,21 @@ variable "documentdb_admin_password" {
   type = string
   sensitive = true
 }
+
+variable "jwt_secret" {
+  description = "JWT secret for authentication service"
+  type        = string
+  sensitive   = true
+}
+
+variable "here_id" {
+  description = "HERE Maps API ID for trip service"
+  type        = string
+  sensitive   = true
+}
+
+variable "here_secret" {
+  description = "HERE Maps API secret for trip service"
+  type        = string
+  sensitive   = true
+}

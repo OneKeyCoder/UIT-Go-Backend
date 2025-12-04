@@ -47,3 +47,44 @@ resource "azurerm_role_assignment" "aca_kv_reader" {
   role_definition_name = "Key Vault Secrets User"
   principal_id         = azurerm_user_assigned_identity.apps.principal_id
 }
+
+# Application secrets - these should be rotated in production
+resource "azurerm_key_vault_secret" "jwt_secret" {
+  name         = "${var.resource_prefix}-jwt-secret"
+  key_vault_id = azurerm_key_vault.keyvault.id
+  value        = var.jwt_secret
+
+  lifecycle {
+    ignore_changes = [ 
+      value
+    ]
+  }
+  depends_on = [azurerm_role_assignment.terraform_kv_admin]
+}
+
+# HERE Maps API credentials for trip service
+resource "azurerm_key_vault_secret" "here_id" {
+  name         = "${var.resource_prefix}-here-id"
+  key_vault_id = azurerm_key_vault.keyvault.id
+  value        = var.here_id
+
+  lifecycle {
+    ignore_changes = [ 
+      value
+    ]
+  }
+  depends_on = [azurerm_role_assignment.terraform_kv_admin]
+}
+
+resource "azurerm_key_vault_secret" "here_secret" {
+  name         = "${var.resource_prefix}-here-secret"
+  key_vault_id = azurerm_key_vault.keyvault.id
+  value        = var.here_secret
+
+  lifecycle {
+    ignore_changes = [ 
+      value
+    ]
+  }
+  depends_on = [azurerm_role_assignment.terraform_kv_admin]
+}
