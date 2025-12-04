@@ -5,11 +5,16 @@ import (
 	"strings"
 )
 
-// RabbitMQURL returns the AMQP connection string built from split env vars.
-// If RABBITMQ_URL is set, it takes precedence for backward compatibility.
+// RabbitMQURL returns a fully-qualified AMQP(S) connection string.
+// Priority order:
+//  1. RABBITMQ_CONNECTION_STRING (new preferred variable)
+//  2. RABBITMQ_URL (legacy single string)
+//  3. Individual host/user/password env vars
 func RabbitMQURL() string {
-	if url := Get("RABBITMQ_URL", ""); url != "" {
-		return url
+	for _, key := range []string{"RABBITMQ_CONNECTION_STRING", "RABBITMQ_URL"} {
+		if url := strings.TrimSpace(Get(key, "")); url != "" {
+			return url
+		}
 	}
 
 	host := Get("RABBITMQ_HOST", "rabbitmq")

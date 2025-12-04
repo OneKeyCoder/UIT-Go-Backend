@@ -129,15 +129,17 @@ func main() {
 }
 
 func connectToMongo() (*mongo.Client, error) {
-	mongoURL := env.Get("MONGO_URL", "mongodb://mongo:27017")
-	username := env.Get("MONGO_USERNAME", "admin")
-	password := env.Get("MONGO_PASSWORD", "password")
+	mongoURL, needsAuth := resolveMongoURL()
 	clientOptions := options.Client().ApplyURI(mongoURL)
-	if username != "" || password != "" {
-		clientOptions.SetAuth(options.Credential{
-			Username: username,
-			Password: password,
-		})
+	if needsAuth {
+		username := env.Get("MONGO_USERNAME", "admin")
+		password := env.Get("MONGO_PASSWORD", "password")
+		if username != "" || password != "" {
+			clientOptions.SetAuth(options.Credential{
+				Username: username,
+				Password: password,
+			})
+		}
 	}
 
 	// Connection pooling configuration
@@ -153,4 +155,16 @@ func connectToMongo() (*mongo.Client, error) {
 
 	logger.Info("Connected to MongoDB successfully")
 	return c, nil
+}
+
+func resolveMongoURL() (string, bool) {
+	for _, key := range []string{"MONGO_CONNECTION_STRING", "MONGO_URL"} {
+		if uri := env.Get(key, ""); uri != "" {
+			return uri, false
+		}
+	}
+
+	host := env.Get("MONGO_HOST", "mongo")
+	port := env.Get("MONGO_PORT", "27017")
+	return fmt.Sprintf("mongodb://%s:%s", host, port), true
 }

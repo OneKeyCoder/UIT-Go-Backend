@@ -3,7 +3,9 @@ package configs
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/logger"
@@ -12,11 +14,12 @@ import (
 )
 
 type MongoConfig struct {
-	Host     string
-	Port     string
-	Database string
-	Username string
-	Password string
+	Host       string
+	Port       string
+	Database   string
+	Username   string
+	Password   string
+	AuthSource string
 }
 
 var MongoClient *mongo.Client
@@ -29,20 +32,28 @@ func getEnv(key, defaultValue string) string {
 	return defaultValue
 }
 
+func getMongoConnectionString() string {
+	if uri := os.Getenv("MONGO_CONNECTION_STRING"); uri != "" {
+		return uri
+	}
+	return os.Getenv("MONGO_URL")
+}
+
 func GetMongoConfig() *MongoConfig {
 	return &MongoConfig{
-		Host:     getEnv("MONGO_HOST", "mongo"),
-		Port:     getEnv("MONGO_PORT", "27017"),
-		Database: getEnv("MONGO_DATABASE", "mongo"),
-		Username: getEnv("MONGO_USERNAME", "admin"),
-		Password: getEnv("MONGO_PASSWORD", "password"),
+		Host:       getEnv("MONGO_HOST", "mongo"),
+		Port:       getEnv("MONGO_PORT", "27017"),
+		Database:   getEnv("MONGO_DATABASE", "mongo"),
+		Username:   getEnv("MONGO_USERNAME", "admin"),
+		Password:   getEnv("MONGO_PASSWORD", "password"),
+		AuthSource: getEnv("MONGO_AUTH_SOURCE", "admin"),
 	}
 }
 
 func ConnectMongo() (*mongo.Client, error) {
-	// Check if MONGO_URL is provided (for docker-compose)
-	if mongoURL := os.Getenv("MONGO_URL"); mongoURL != "" {
-		logger.Info("Using MONGO_URL from environment", "url", mongoURL)
+	// Prefer a single connection string when provided.
+	if mongoURL := getMongoConnectionString(); mongoURL != "" {
+		logger.Info("Using Mongo connection string from environment", "url", mongoURL)
 
 		// Set client options
 		clientOptions := options.Client().ApplyURI(mongoURL)
@@ -62,7 +73,7 @@ func ConnectMongo() (*mongo.Client, error) {
 			return nil, fmt.Errorf("failed to ping MongoDB: %w", err)
 		}
 
-		logger.Info("Successfully connected to MongoDB via MONGO_URL")
+		logger.Info("Successfully connected to MongoDB via connection string")
 		return client, nil
 	}
 
@@ -75,6 +86,9 @@ func ConnectMongo() (*mongo.Client, error) {
 		// With authentication
 		uri = fmt.Sprintf("mongodb://%s:%s@%s:%s/%s",
 			config.Username, config.Password, config.Host, config.Port, config.Database)
+		if authSource := strings.TrimSpace(config.AuthSource); authSource != "" {
+			uri = fmt.Sprintf("%s?authSource=%s", uri, url.QueryEscape(authSource))
+		}
 	} else {
 		// No authentication (default)
 		uri = fmt.Sprintf("mongodb://%s:%s/%s",
@@ -102,7 +116,8 @@ func ConnectMongo() (*mongo.Client, error) {
 	logger.Info("Successfully connected to MongoDB",
 		"host", config.Host,
 		"port", config.Port,
-		"database", config.Database)
+		"database", config.Database,
+		"authSource", config.AuthSource)
 
 	return client, nil
 }
