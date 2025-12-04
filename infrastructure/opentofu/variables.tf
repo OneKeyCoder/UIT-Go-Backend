@@ -14,3 +14,13 @@ variable "environment" {
   description = "Environment (dev, staging, prod)"
   type        = string
 }
+
+variable "postgres_admin_username" {
+  type = string
+  sensitive = true
+}
+
+variable "postgres_admin_password" {
+  type = string
+  sensitive = true
+}

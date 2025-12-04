@@ -29,30 +29,16 @@ resource "azurerm_key_vault" "keyvault" {
   resource_group_name = var.resource_group_name
   tenant_id           = data.azurerm_client_config.current.tenant_id
 
-  public_network_access_enabled = false
+  public_network_access_enabled = true
+  rbac_authorization_enabled = true
+
   soft_delete_retention_days  = 7
   purge_protection_enabled    = false
 
-  rbac_authorization_enabled = true
-}
-
-resource "azurerm_private_endpoint" "name" {
-  subnet_id = var.private_endpoint_subnet_id
-
-  name = "kv-private-endpoint"
-  location = var.location
-  resource_group_name = var.resource_group_name
-
-  private_service_connection {
-    name = "kv-connection"
-    private_connection_resource_id = azurerm_key_vault.keyvault.id
-    subresource_names = ["vault"]
-    is_manual_connection = false
-  }
-
-  private_dns_zone_group {
-    name = "default"
-    private_dns_zone_ids = [var.private_dns_zone_id]
+  network_acls {
+    bypass = "AzureServices"
+    default_action = "Deny"
+    virtual_network_subnet_ids = var.allowed_subnet_ids
   }
 }
 

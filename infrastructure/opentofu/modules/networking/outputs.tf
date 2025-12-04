@@ -1,17 +1,17 @@
-output "postgres-subnet" {
-  value = azurerm_subnet.postgres-db
+output "postgres-subnet-id" {
+  value = azurerm_subnet.postgres.id
 }
 
-output "aca-subnet" {
-  value = azurerm_subnet.aca
+output "aca-subnet-id" {
+  value = azurerm_subnet.aca.id
 }
 
-output "dmz-subnet" {
-  value = azurerm_subnet.dmz
+output "dmz-subnet-id" {
+  value = azurerm_subnet.dmz.id
 }
 
-output "main-vnet" {
-  value = azurerm_virtual_network.main
+output "main-vnet-id" {
+  value = azurerm_virtual_network.main.id
 }
 
 output "endpoints-subnet" {

@@ -22,6 +22,11 @@ resource "azurerm_subnet" "aca" {
       actions = ["Microsoft.Network/virtualNetworks/subnets/action"]
     }
   }
+  service_endpoints = [
+    "Microsoft.KeyVault",
+    "Microsoft.ContainerRegistry",
+    "Microsoft.ServiceBus",
+  ]
 }
 
 resource "azurerm_subnet" "dmz" {
@@ -55,21 +60,10 @@ resource "azurerm_subnet" "endpoints" {
   
   private_endpoint_network_policies = "Disabled" 
 }
-# Key Vault Private Links
-resource "azurerm_private_dns_zone" "kv" {
-  name                = "privatelink.vaultcore.azure.net"
-  resource_group_name = var.resource_group_name
-}
-resource "azurerm_private_dns_zone_virtual_network_link" "kv_link" {
-  name                  = "kv-link"
-  resource_group_name   = var.resource_group_name
-  private_dns_zone_name = azurerm_private_dns_zone.kv.name
-  virtual_network_id    = azurerm_virtual_network.main.id
-}
 
 # acls
 resource "azurerm_network_security_group" "aca_nsg" {
-  name = "nsg-aca"
+  name = "aca-nsg"
   location = var.location
   resource_group_name = var.resource_group_name
 
