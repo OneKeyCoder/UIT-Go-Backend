@@ -45,14 +45,23 @@ resource "azurerm_key_vault_secret" "primary" {
   name = "${var.resource_prefix}-redis-primary-key"
   key_vault_id = var.key_vault_id
   value = azurerm_managed_redis.redis.default_database[0].primary_access_key
+  lifecycle {
+    ignore_changes = [ value ]
+  }
 }
 resource "azurerm_key_vault_secret" "secondary" {
   name = "${var.resource_prefix}-redis-secondary-key"
   key_vault_id = var.key_vault_id
   value = azurerm_managed_redis.redis.default_database[0].secondary_access_key
+  lifecycle {
+    ignore_changes = [ value ]
+  }
 }
 resource "azurerm_key_vault_secret" "port" {
   name = "${var.resource_prefix}-redis-port"
   key_vault_id = var.key_vault_id
   value = azurerm_managed_redis.redis.default_database[0].port
+  lifecycle {
+    ignore_changes = [ value ]
+  }
 }

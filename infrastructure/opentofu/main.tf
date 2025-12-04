@@ -119,3 +119,14 @@ module "documentdb" {
   storage_size_in_gb = 32
 }
 
+module "files-mount" {
+  source = "./modules/files"
+
+  resource_prefix = var.resource_prefix
+  resource_group_name = local.rg_name
+  location = local.rg_location
+
+  allowed_subnet_ids = [module.networking.aca-subnet-id]
+  key_vault_id = module.key_vault.id
+}
+

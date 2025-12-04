@@ -33,3 +33,17 @@ resource "azurerm_key_vault" "keyvault" {
     virtual_network_subnet_ids = var.allowed_subnet_ids
   }
 }
+
+# Grant Terraform service principal permissions to manage secrets
+resource "azurerm_role_assignment" "terraform_kv_admin" {
+  scope                = azurerm_key_vault.keyvault.id
+  role_definition_name = "Key Vault Secrets Officer"
+  principal_id         = data.azurerm_client_config.current.object_id
+}
+
+# Grant ACA managed identity permission to read secrets
+resource "azurerm_role_assignment" "aca_kv_reader" {
+  scope                = azurerm_key_vault.keyvault.id
+  role_definition_name = "Key Vault Secrets User"
+  principal_id         = azurerm_user_assigned_identity.apps.principal_id
+}
