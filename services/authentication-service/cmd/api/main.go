@@ -15,13 +15,13 @@ import (
 	_ "github.com/jackc/pgx/v5"
 	_ "github.com/jackc/pgx/v5/stdlib"
 
-	"github.com/OneKeyCoder/UIT-Go-Backend/common/grpcutil"
 	"github.com/Azure/go-amqp"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/env"
+	"github.com/OneKeyCoder/UIT-Go-Backend/common/grpcutil"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/logger"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/rabbitmq"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/telemetry"
-  	userpb "github.com/OneKeyCoder/UIT-Go-Backend/proto/user"
+	userpb "github.com/OneKeyCoder/UIT-Go-Backend/proto/user"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -37,7 +37,7 @@ type Config struct {
 	JWTExpiry     time.Duration
 	RefreshExpiry time.Duration
 	RabbitConn    *amqp.Conn
-  	UserClient    userpb.UserServiceClient
+	UserClient    userpb.UserServiceClient
 }
 
 func main() {
