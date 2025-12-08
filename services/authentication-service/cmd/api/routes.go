@@ -8,12 +8,14 @@ import (
 	"github.com/go-chi/cors"
 	commonMiddleware "github.com/OneKeyCoder/UIT-Go-Backend/common/middleware"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 func (app *Config) routes() http.Handler {
 	mux := chi.NewRouter()
 
-	// Add common middleware
+	// Request ID must be first
+	mux.Use(commonMiddleware.RequestID)
 	mux.Use(commonMiddleware.Logger)
 	mux.Use(commonMiddleware.Recovery)
 	mux.Use(commonMiddleware.PrometheusMetrics("authentication-service"))
@@ -22,13 +24,27 @@ func (app *Config) routes() http.Handler {
 	mux.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"https://*", "http://*"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
-		ExposedHeaders:   []string{"Link"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token", "X-Request-ID"},
+		ExposedHeaders:   []string{"Link", "X-Request-ID"},
 		AllowCredentials: true,
 		MaxAge:           300,
 	}))
 
 	mux.Use(middleware.Heartbeat("/ping"))
+
+	// Add OpenTelemetry HTTP instrumentation with operation-specific names
+	mux.Use(func(next http.Handler) http.Handler {
+		return otelhttp.NewHandler(
+			next,
+			"authentication-service.http",
+			otelhttp.WithFilter(func(req *http.Request) bool {
+				return !commonMiddleware.ShouldSkipTrace(req.URL.Path)
+			}),
+			otelhttp.WithSpanNameFormatter(func(operation string, r *http.Request) string {
+				return r.Method + " " + r.URL.Path
+			}),
+		)
+	})
 
 	// Health check endpoints for Kubernetes
 	mux.Get("/health/live", app.Liveness)

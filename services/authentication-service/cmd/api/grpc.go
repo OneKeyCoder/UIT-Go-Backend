@@ -8,11 +8,11 @@ import (
 
 	"authentication-service/data"
 
-	"github.com/OneKeyCoder/UIT-Go-Backend/common/grpcutil"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/jwt"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/logger"
 	pb "github.com/OneKeyCoder/UIT-Go-Backend/proto/auth"
 	userpb "github.com/OneKeyCoder/UIT-Go-Backend/proto/user"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -54,10 +54,10 @@ func (s *AuthServer) Register(ctx context.Context, req *pb.RegisterRequest) (*pb
 
 	// Create user in user-service via gRPC
 	if s.Config.UserClient != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		userCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		defer cancel()
 
-		_, err = s.Config.UserClient.CreateUser(ctx, &userpb.CreateUserRequest{
+		_, err = s.Config.UserClient.CreateUser(userCtx, &userpb.CreateUserRequest{
 			Email:     req.Email,
 			FirstName: req.FirstName,
 			LastName:  req.LastName,
@@ -223,7 +223,7 @@ func (app *Config) StartGRPCServer() error {
 	}
 
 	grpcServer := grpc.NewServer(
-		grpc.UnaryInterceptor(grpcutil.UnaryServerInterceptor()),
+		grpc.StatsHandler(otelgrpc.NewServerHandler()),
 	)
 
 	authServer := &AuthServer{

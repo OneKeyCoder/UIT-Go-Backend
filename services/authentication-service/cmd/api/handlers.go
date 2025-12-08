@@ -214,10 +214,10 @@ func (app *Config) Register(w http.ResponseWriter, r *http.Request) {
 
 	// Create user in user-service via gRPC
 	if app.UserClient != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		userCtx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 		defer cancel()
 
-		_, err = app.UserClient.CreateUser(ctx, &userpb.CreateUserRequest{
+		_, err = app.UserClient.CreateUser(userCtx, &userpb.CreateUserRequest{
 			Email:     requestPayload.Email,
 			FirstName: requestPayload.FirstName,
 			LastName:  requestPayload.LastName,

@@ -21,7 +21,7 @@ otelcol.receiver.otlp "default" {
 // ============================================================================
 otelcol.processor.batch "traces" {
   output {
-    traces = [otelcol.exporter.otlp.jaeger.input]
+    traces = [otelcol.exporter.otlp.tempo.input]
   }
 }
 
@@ -41,18 +41,17 @@ otelcol.processor.batch "logs" {
 // Exporters
 // ============================================================================
 
-// Jaeger - receives traces via OTLP
-otelcol.exporter.otlp "jaeger" {
+// Tempo - receives traces via OTLP
+otelcol.exporter.otlp "tempo" {
   client {
-    endpoint = "jaeger:4317"
+    endpoint = "tempo:4317"
     tls {
       insecure = true
     }
   }
 }
 
-// Loki - receives logs via OTLP HTTP endpoint
-// Loki 3.x natively supports OTLP at /otlp endpoint
+// Loki - send logs to Loki native OTLP endpoint
 otelcol.exporter.otlphttp "loki" {
   client {
     endpoint = "http://loki:3100/otlp"
@@ -67,5 +66,15 @@ otelcol.exporter.prometheus "default" {
 prometheus.remote_write "default" {
   endpoint {
     url = "http://prometheus:9090/api/v1/write"
+  }
+}
+
+// ============================================================================
+// Containerd log scraping -> Loki
+// ============================================================================
+
+loki.write "default" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
   }
 }

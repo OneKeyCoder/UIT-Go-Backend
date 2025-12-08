@@ -36,7 +36,7 @@ groups:
             
             **Immediate Action Required:**
             1. Check recent deployments
-            2. Review Jaeger traces for failing requests
+            2. Review Tempo traces for failing requests
             3. Check dependent service health
           runbook_url: "https://github.com/OneKeyCoder/UIT-Go-Backend/blob/master/docs/runbooks/high-error-rate.md"
 
@@ -106,7 +106,7 @@ groups:
             SLO target: 500ms
             
             **Debug Steps:**
-            1. Check Jaeger for slow traces
+            1. Check Tempo for slow traces
             2. Review downstream service latencies
             3. Check for resource contention (CPU/Memory)
 

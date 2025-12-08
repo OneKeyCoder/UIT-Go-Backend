@@ -6,7 +6,7 @@ import (
 	"logger-service/data"
 	"net"
 
-	"github.com/OneKeyCoder/UIT-Go-Backend/common/grpcutil"
+
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/logger"
 	pb "github.com/OneKeyCoder/UIT-Go-Backend/proto/logger"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
@@ -30,9 +30,6 @@ func (app *Config) StartGRPCServer() error {
 
 	s := grpc.NewServer(
 		grpc.StatsHandler(otelgrpc.NewServerHandler()),
-		grpc.ChainUnaryInterceptor(
-			grpcutil.UnaryServerInterceptor(),
-		),
 	)
 
 	pb.RegisterLoggerServiceServer(s, &LoggerServer{Models: app.Models})

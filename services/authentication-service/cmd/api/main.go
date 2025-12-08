@@ -15,13 +15,15 @@ import (
 	_ "github.com/jackc/pgx/v5"
 	_ "github.com/jackc/pgx/v5/stdlib"
 
-	"github.com/OneKeyCoder/UIT-Go-Backend/common/grpcutil"
 	"github.com/Azure/go-amqp"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/env"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/logger"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/rabbitmq"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/telemetry"
-  	userpb "github.com/OneKeyCoder/UIT-Go-Backend/proto/user"
+	userpb "github.com/OneKeyCoder/UIT-Go-Backend/proto/user"
+	"github.com/XSAM/otelsql"
+	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -104,7 +106,7 @@ func main() {
 	userConn, err := grpc.NewClient(
 		"user-service:50055",
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithUnaryInterceptor(grpcutil.UnaryClientInterceptor()),
+		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
 	)
 	if err != nil {
 		logger.Error("Failed to connect to user-service", "error", err)
@@ -170,9 +172,17 @@ func main() {
 }
 
 func openDB(dsn string) (*sql.DB, error) {
-	db, err := sql.Open("pgx", dsn)
+	// Use otelsql for automatic PostgreSQL tracing
+	db, err := otelsql.Open("pgx", dsn,
+		otelsql.WithAttributes(semconv.DBSystemPostgreSQL),
+	)
 	if err != nil {
 		return nil, err
+	}
+
+	// Register DB stats metrics
+	if err := otelsql.RegisterDBStatsMetrics(db, otelsql.WithAttributes(semconv.DBSystemPostgreSQL)); err != nil {
+		logger.Warn("Failed to register DB stats", "error", err)
 	}
 
 	// Connection pooling configuration

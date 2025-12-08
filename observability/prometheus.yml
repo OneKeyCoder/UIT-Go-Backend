@@ -11,11 +11,11 @@ global:
     cluster: 'uit-go-local'
     environment: 'development'
 
-# Alertmanager configuration (for future integration)
-# alerting:
-#   alertmanagers:
-#     - static_configs:
-#         - targets: ['alertmanager:9093']
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']
 
 # Rule files for alerts
 rule_files:
@@ -96,10 +96,10 @@ scrape_configs:
       - target_label: service
         replacement: user-service
 
-  # Jaeger - for tracing infrastructure health
-  - job_name: 'jaeger'
+  # Tempo - tracing backend health
+  - job_name: 'tempo'
     static_configs:
-      - targets: ['jaeger:8888']
+      - targets: ['tempo:3200']
     metrics_path: /metrics
 
   # Loki - for logging infrastructure health

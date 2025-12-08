@@ -1,0 +1,36 @@
+global:
+  resolve_timeout: 5m
+  smtp_smarthost: 'smtp.gmail.com:587'
+  smtp_from: 'lyhuavanly@gmail.com'
+  smtp_auth_username: 'lyhuavanly@gmail.com'
+  smtp_auth_password: 'uyde bkug nxuf zbqe'
+  smtp_require_tls: true
+
+route:
+  receiver: gmail-alerts
+  group_by: ['alertname', 'service']
+  group_wait: 10s
+  group_interval: 1m
+  repeat_interval: 4h
+
+receivers:
+  - name: gmail-alerts
+    email_configs:
+      - to: 'lyhuavanly@gmail.com'
+        send_resolved: true
+        headers:
+          subject: '[UIT-Go] {{ .CommonLabels.alertname }}'
+        html: |
+          <h3>{{ .CommonLabels.alertname }} ({{ .Status }})</h3>
+          <p>{{ range .Alerts }}<strong>Service:</strong> {{ if .Labels.service }}{{ .Labels.service }}{{ else }}n/a{{ end }}<br/>
+          <strong>Severity:</strong> {{ if .Labels.severity }}{{ .Labels.severity }}{{ else }}n/a{{ end }}<br/>
+          <strong>Description:</strong> {{ if .Annotations.description }}{{ .Annotations.description }}{{ else }}n/a{{ end }}<br/>
+          <strong>Runbook:</strong> <a href="{{ if .Annotations.runbook_url }}{{ .Annotations.runbook_url }}{{ else }}https://github.com/OneKeyCoder/UIT-Go-Backend/tree/master/observability/runbooks{{ end }}">link</a><br/>
+          <hr/>{{ end }}</p>
+
+inhibit_rules:
+  - source_match:
+      severity: critical
+    target_match:
+      severity: warning
+    equal: ['alertname', 'service']

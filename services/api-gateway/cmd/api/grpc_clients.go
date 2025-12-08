@@ -5,13 +5,13 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/OneKeyCoder/UIT-Go-Backend/common/grpcutil"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/logger"
 	authpb "github.com/OneKeyCoder/UIT-Go-Backend/proto/auth"
 	locationpb "github.com/OneKeyCoder/UIT-Go-Backend/proto/location"
 	loggerpb "github.com/OneKeyCoder/UIT-Go-Backend/proto/logger"
 	trippb "github.com/OneKeyCoder/UIT-Go-Backend/proto/trip"
 	userpb "github.com/OneKeyCoder/UIT-Go-Backend/proto/user"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -31,7 +31,7 @@ func InitGRPCClients() (*GRPCClients, error) {
 	authConn, err := grpc.NewClient(
 		"authentication-service:50051",
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithUnaryInterceptor(grpcutil.UnaryClientInterceptor()),
+		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
 	)
 	if err != nil {
 		logger.Error("Failed to connect to authentication service", "error", err)
@@ -42,7 +42,7 @@ func InitGRPCClients() (*GRPCClients, error) {
 	loggerConn, err := grpc.NewClient(
 		"logger-service:50052",
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithUnaryInterceptor(grpcutil.UnaryClientInterceptor()),
+		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
 	)
 	if err != nil {
 		logger.Error("Failed to connect to logger service", "error", err)
@@ -53,7 +53,7 @@ func InitGRPCClients() (*GRPCClients, error) {
 	locationConn, err := grpc.NewClient(
 		"location-service:50053",
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithUnaryInterceptor(grpcutil.UnaryClientInterceptor()),
+		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
 	)
 	if err != nil {
 		logger.Error("Failed to connect to location service", "error", err)
@@ -63,7 +63,7 @@ func InitGRPCClients() (*GRPCClients, error) {
 	tripConn, err := grpc.NewClient(
 		"trip-service:50054",
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithUnaryInterceptor(grpcutil.UnaryClientInterceptor()),
+		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
 	)
 	if err != nil {
 		logger.Error("Failed to connect to trip service", "error", err)
@@ -74,7 +74,7 @@ func InitGRPCClients() (*GRPCClients, error) {
 	userConn, err := grpc.NewClient(
 		"user-service:50055",
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithUnaryInterceptor(grpcutil.UnaryClientInterceptor()),
+		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
 	)
 	if err != nil {
 		logger.Error("Failed to connect to user service", "error", err)

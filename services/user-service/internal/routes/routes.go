@@ -2,52 +2,25 @@ package routes
 
 import (
 	"net/http"
-	"time"
 	"user-service/internal/handlers"
 
+	commonMiddleware "github.com/OneKeyCoder/UIT-Go-Backend/common/middleware"
 	"github.com/gin-gonic/gin"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 )
-
-var (
-	httpRequestsTotal = promauto.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "user_service_http_requests_total",
-			Help: "Total number of HTTP requests",
-		},
-		[]string{"method", "path", "status"},
-	)
-
-	httpRequestDuration = promauto.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Name:    "user_service_http_request_duration_seconds",
-			Help:    "HTTP request duration in seconds",
-			Buckets: prometheus.DefBuckets,
-		},
-		[]string{"method", "path"},
-	)
-)
-
-// metricsMiddleware wraps Gin handlers with Prometheus metrics
-func metricsMiddleware() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		start := time.Now()
-
-		c.Next()
-
-		duration := time.Since(start).Seconds()
-		status := c.Writer.Status()
-
-		httpRequestsTotal.WithLabelValues(c.Request.Method, c.Request.URL.Path, http.StatusText(status)).Inc()
-		httpRequestDuration.WithLabelValues(c.Request.Method, c.Request.URL.Path).Observe(duration)
-	}
-}
 
 func SetupRoutes(router *gin.Engine, userHandlers *handlers.Handlers) {
-	// Apply metrics middleware to all routes
-	router.Use(metricsMiddleware())
+	// Apply shared metrics middleware so labels match Grafana dashboards
+	router.Use(commonMiddleware.GinPrometheusMetrics("user-service"))
+
+	// Add OpenTelemetry instrumentation for Gin (skip /metrics and health endpoints)
+	router.Use(otelgin.Middleware(
+		"user-service",
+		otelgin.WithFilter(func(req *http.Request) bool {
+			return !commonMiddleware.ShouldSkipTrace(req.URL.Path)
+		}),
+	))
 
 	// Health check endpoints
 	router.GET("/health/live", func(c *gin.Context) {

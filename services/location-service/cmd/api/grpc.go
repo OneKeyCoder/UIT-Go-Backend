@@ -8,10 +8,11 @@ import (
 
 	location_service "location-service/internal"
 
-	"github.com/OneKeyCoder/UIT-Go-Backend/common/grpcutil"
+
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/logger"
 	pb "github.com/OneKeyCoder/UIT-Go-Backend/proto/location"
 
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 )
 
@@ -179,7 +180,7 @@ func startGRPCServer(locationService *location_service.LocationService) {
 	}
 
 	s := grpc.NewServer(
-		grpc.UnaryInterceptor(grpcutil.UnaryServerInterceptor()),
+		grpc.StatsHandler(otelgrpc.NewServerHandler()),
 	)
 
 	pb.RegisterLocationServiceServer(s, &LocationServer{

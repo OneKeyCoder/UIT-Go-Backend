@@ -2,6 +2,7 @@ package telemetry
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
 	"strings"
@@ -9,12 +10,14 @@ import (
 
 	"go.opentelemetry.io/contrib/bridges/otelslog"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 	"go.opentelemetry.io/otel/log/global"
+	"go.opentelemetry.io/otel/propagation"
 	sdklog "go.opentelemetry.io/otel/sdk/log"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -36,15 +39,31 @@ var (
 //   - OTEL_COLLECTOR_ENDPOINT: endpoint URL or host:port
 //   - OTEL_EXPORTER_OTLP_HEADERS: optional headers for auth (e.g., "Authorization=Basic xxx")
 //   - OTEL_INSECURE: "true" to disable TLS (for local development)
+//   - REPLICA_ID: replica/pod identifier (e.g., pod name in Kubernetes)
 func InitTracer(serviceName, serviceVersion string) (func(context.Context) error, error) {
 	ctx := context.Background()
 	
-	// Create resource with service information
+	// Get replica ID from environment (hostname in containers, pod name in K8s)
+	replicaID := os.Getenv("REPLICA_ID")
+	if replicaID == "" {
+		// Fallback to hostname for local development
+		hostname, err := os.Hostname()
+		if err == nil {
+			replicaID = hostname
+		} else {
+			replicaID = "unknown"
+		}
+	}
+	
+	// Create resource with service information + replica ID
 	res, err := resource.New(
 		ctx,
 		resource.WithAttributes(
 			semconv.ServiceNameKey.String(serviceName),
 			semconv.ServiceVersionKey.String(serviceVersion),
+			// Custom attributes for Loki labels
+			attribute.String("replica.id", replicaID),
+			attribute.String("deployment.environment", getEnv("ENVIRONMENT", "development")),
 		),
 	)
 	if err != nil {
@@ -99,8 +118,10 @@ func InitTracer(serviceName, serviceVersion string) (func(context.Context) error
 			// Create gRPC log exporter
 			logExporter, err := createGRPCLogExporter(ctx, endpoint)
 			if err != nil {
+				fmt.Fprintf(os.Stderr, "[TELEMETRY INIT] Failed to create gRPC log exporter: %v\n", err)
 				return nil, err
 			}
+			fmt.Fprintf(os.Stderr, "[TELEMETRY INIT] Created gRPC log exporter for endpoint=%s\n", endpoint)
 			lp = sdklog.NewLoggerProvider(
 				sdklog.WithProcessor(sdklog.NewBatchProcessor(logExporter)),
 				sdklog.WithResource(res),
@@ -127,6 +148,12 @@ func InitTracer(serviceName, serviceVersion string) (func(context.Context) error
 	// Set global trace provider
 	otel.SetTracerProvider(tp)
 
+	// Set global propagators for trace context propagation (CRITICAL for distributed tracing)
+	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
+		propagation.TraceContext{},
+		propagation.Baggage{},
+	))
+
 	// Create tracer
 	Tracer = tp.Tracer(serviceName)
 
@@ -134,9 +161,11 @@ func InitTracer(serviceName, serviceVersion string) (func(context.Context) error
 	if lp != nil {
 		global.SetLoggerProvider(lp)
 		Logger = otelslog.NewLogger(serviceName)
+		fmt.Fprintf(os.Stderr, "[TELEMETRY INIT] Set global LoggerProvider for service=%s\n", serviceName)
 	} else {
 		// Use default slog for stdout mode
 		Logger = slog.Default()
+		fmt.Fprintf(os.Stderr, "[TELEMETRY INIT] Using default slog (LoggerProvider is nil) for service=%s\n", serviceName)
 	}
 
 	// Return shutdown function
@@ -251,6 +280,14 @@ func parseHeaders(headerStr string) map[string]string {
 		}
 	}
 	return headers
+}
+
+// getEnv returns environment variable or default value
+func getEnv(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
 }
 
 // StartSpan starts a new span with the given name

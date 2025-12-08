@@ -19,6 +19,9 @@ import (
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/env"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/logger"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/rabbitmq"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type TripService struct {
@@ -29,23 +32,42 @@ type TripService struct {
 
 var tripMap = make(map[int][]int)
 
-func (trip *TripService) CreateTrip(newTrip repository.NewTripDTO) (models.Trip, float64, error) {
+func (trip *TripService) CreateTrip(ctx context.Context, newTrip repository.NewTripDTO) (models.Trip, float64, error) {
+	tracer := otel.Tracer("trip-service")
+	ctx, span := tracer.Start(ctx, "TripService.CreateTrip",
+		trace.WithAttributes(
+			attribute.Int("passenger_id", newTrip.PassengerID),
+			attribute.Float64("origin_lat", newTrip.OriginLat),
+			attribute.Float64("origin_lng", newTrip.OriginLng),
+			attribute.Float64("dest_lat", newTrip.DestLat),
+			attribute.Float64("dest_lng", newTrip.DestLng),
+		),
+	)
+	defer span.End()
+	
+	_, routeSpan := tracer.Start(ctx, "GetRouteSummary")
 	origin := fmt.Sprintf("%f,%f", newTrip.OriginLat, newTrip.OriginLng)
 	destination := fmt.Sprintf("%f,%f", newTrip.DestLat, newTrip.DestLng)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	routeCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	routeSummary, err := internal.GetRouteSummary(ctx, origin, destination)
+	routeSummary, err := internal.GetRouteSummary(routeCtx, origin, destination)
+	routeSpan.End()
 	if err != nil {
-		logger.Error("Failed to get route summary from HERE API", "error", err)
+		logger.Error(ctx, "Failed to get route summary from HERE API", "error", err)
+		span.RecordError(err)
 		return models.Trip{}, 0, err
 	}
-	logger.Info("Route Summary", "route", routeSummary)
+	logger.Info(ctx, "Route Summary", "route", routeSummary)
+	_, dbSpan := tracer.Start(ctx, "DB.CreateTrip")
 	tripRecord, err := trip.DB.CreateTrip(newTrip, routeSummary.Distance, routeSummary.Fare)
+	dbSpan.End()
 	if err != nil {
-		logger.Error("Failed to create trip in database", "error", err)
+		logger.Error(ctx, "Failed to create trip in database", "error", err)
+		span.RecordError(err)
 		return models.Trip{}, 0, err
 	}
+	span.SetAttributes(attribute.Int("trip_id", tripRecord.ID))
 	if trip.RabbitConn != nil {
 		eventData := fmt.Sprintf("User %d requested a trip from (%f, %f) to (%f, %f)",
 			newTrip.PassengerID,
@@ -56,10 +78,10 @@ func (trip *TripService) CreateTrip(newTrip repository.NewTripDTO) (models.Trip,
 		)
 		go PublishEvent(trip.RabbitConn, "user.createTrip", eventData)
 	}
-	err = trip.getAllAvailableDrivers(tripRecord.ID, tripRecord.PassengerID)
+	err = trip.getAllAvailableDrivers(ctx, tripRecord.ID, tripRecord.PassengerID)
 	if err != nil {
-		logger.Error("Failed to get available drivers", "error", err)
-		return tripRecord, routeSummary.Duration, err
+		logger.Error(ctx, "Failed to get available drivers", "error", err)
+		// Don't return error - trip is created, just no drivers yet
 	}
 	return tripRecord, routeSummary.Duration, nil
 }
@@ -215,15 +237,31 @@ func (trip *TripService) CancelTrip(userID int, tripID int) error {
 	return nil
 }
 
-func (trip *TripService) getAllAvailableDrivers(tripID int, userID int) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+func (trip *TripService) getAllAvailableDrivers(ctx context.Context, tripID int, userID int) error {
+	tracer := otel.Tracer("trip-service")
+	ctx, span := tracer.Start(ctx, "TripService.getAllAvailableDrivers",
+		trace.WithAttributes(
+			attribute.Int("trip_id", tripID),
+			attribute.Int("user_id", userID),
+		),
+	)
+	defer span.End()
+	
 	radiusList := []float64{5000.0, 10000.0, 15000.0}
 
-	for _, radius := range radiusList {
-		locations, err := trip.grpcClients.FindNearestUsersViaGRPC(ctx, userID, 5, radius)
+	for i, radius := range radiusList {
+		_, searchSpan := tracer.Start(ctx, fmt.Sprintf("FindNearestUsers.radius_%d", i+1),
+			trace.WithAttributes(attribute.Float64("radius_meters", radius)),
+		)
+		
+		grpcCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		locations, err := trip.grpcClients.FindNearestUsersViaGRPC(grpcCtx, userID, 5, radius)
+		cancel()
+		searchSpan.End()
+		
 		if err != nil {
-			logger.Error("Failed to get nearest users via gRPC", "radius", radius, "error", err)
+			logger.Error(ctx, "Failed to get nearest users via gRPC", "radius", radius, "error", err)
+			searchSpan.RecordError(err)
 			continue
 		}
 
@@ -236,15 +274,20 @@ func (trip *TripService) getAllAvailableDrivers(tripID int, userID int) error {
 				}
 			}
 
-			logger.Info("Found nearby drivers",
+			logger.Info(ctx, "Found nearby drivers",
 				"user_id", userID,
 				"radius", radius,
 				"found", len(tripMap[tripID]),
 			)
+			span.SetAttributes(
+				attribute.Int("drivers_found", len(tripMap[tripID])),
+				attribute.Float64("search_radius", radius),
+			)
 			return nil
 		}
 	}
-	logger.Warn("No drivers found within 15 km", "user_id", userID)
+	logger.Warn(ctx, "No drivers found within 15 km", "user_id", userID)
+	span.SetAttributes(attribute.Int("drivers_found", 0))
 	return nil
 }
 func (trip *TripService) GetSuggestedDriver(tripID int) (int, error) {
@@ -258,7 +301,7 @@ func (trip *TripService) GetSuggestedDriver(tripID int) (int, error) {
 		return 0, errors.New("trip is not in requested status")
 	}
 	if _, ok := tripMap[tripID]; !ok || len(tripMap[tripID]) == 0 {
-		err := trip.getAllAvailableDrivers(tripID, tripID)
+		err := trip.getAllAvailableDrivers(context.TODO(), tripID, tripID)
 		if err != nil {
 			return 0, err
 		}
