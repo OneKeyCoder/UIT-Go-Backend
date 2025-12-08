@@ -9,6 +9,7 @@ volumes:
   grafana-data:
   loki-data:
   jaeger-data:
+  tempo-data:
 
 services:
   api-gateway:
@@ -169,7 +170,7 @@ services:
       RABBITMQ_DEFAULT_PASS: guest
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
-      - ./observability/rabbitmq-config.conf:/etc/rabbitmq/conf.d/20-uit-go.conf:Z
+
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "ping"]
       interval: 10s
@@ -202,6 +203,9 @@ services:
     ports:
       - "9090:9090"
     restart: unless-stopped
+    depends_on:
+      alertmanager:
+        condition: service_healthy
     volumes:
       - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:Z
       - ./observability/prometheus-alerts.yml:/etc/prometheus/alerts/prometheus-alerts.yml:Z
@@ -211,12 +215,35 @@ services:
       - "--storage.tsdb.path=/prometheus"
       - "--storage.tsdb.retention.time=15d"
       - "--web.enable-lifecycle"
-      - "--web.enable-remote-write-receiver"  # Enable remote write for OTLP metrics
+      - "--web.enable-remote-write-receiver" # Enable remote write for OTLP metrics
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/-/healthy"]
       interval: 30s
       timeout: 10s
       retries: 3
+
+  alertmanager:
+    image: "prom/alertmanager:v0.28.1"
+    ports:
+      - "9093:9093"
+    restart: unless-stopped
+    environment:
+      - SMTP_FROM=${SMTP_FROM}
+      - SMTP_USERNAME=${SMTP_USERNAME}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+    volumes:
+      - ./observability/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+      - "--storage.path=/alertmanager"
+      - "--web.external-url=http://localhost:9093"
+      - "--cluster.advertise-address=0.0.0.0:9093"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9093/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
   grafana:
     image: grafana/grafana:12.3.0
@@ -229,6 +256,8 @@ services:
       loki:
         condition: service_healthy
       jaeger:
+        condition: service_healthy
+      tempo:
         condition: service_healthy
     environment:
       GF_SECURITY_ADMIN_USER: admin
@@ -255,6 +284,7 @@ services:
     restart: unless-stopped
     ports:
       - "3100:3100"
+      - "9096:9096" # you forgot the gRPC port, should use this for internal log push
     volumes:
       - ./observability/loki-config.yml:/etc/loki/local-config.yaml:Z
       - loki-data:/loki
@@ -265,21 +295,41 @@ services:
       timeout: 10s
       retries: 3
 
-  alloy:
-    image: grafana/alloy:latest
+  tempo:
+    image: grafana/tempo:latest
     restart: unless-stopped
     ports:
-      - "12345:12345"  # Alloy UI
+      - "3200:3200" # Tempo HTTP API
+      - "4317:4317" # OTLP gRPC receiver (primary)
+      - "4318:4318" # OTLP HTTP receiver
+      - "9411:9411" # Zipkin receiver
+      - "14268:14268" # Jaeger thrift HTTP
+    volumes:
+      - ./observability/tempo-config.yml:/etc/tempo/tempo.yaml:ro
+      - tempo-data:/var/tempo
+    command: ["-config.file=/etc/tempo/tempo.yaml"]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3200/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  alloy:
+    image: grafana/alloy:latest # You use latest alloy but hard fixed version for Loki? it would crash somedays
+    restart: unless-stopped
+    ports:
+      - "12345:12345" # Alloy UI
     expose:
-      - "4317"  # OTLP gRPC
-      - "4318"  # OTLP HTTP
+      - "4317" # OTLP gRPC
+      - "4318" # OTLP HTTP
     volumes:
       - ./observability/alloy-config.alloy:/etc/alloy/config.alloy:Z
     command: ["run", "/etc/alloy/config.alloy", "--server.http.listen-addr=0.0.0.0:12345"]
     depends_on:
       loki:
         condition: service_healthy
-      jaeger:
+      tempo:
         condition: service_healthy
 
   trip-service:

@@ -3,10 +3,10 @@ package main
 import (
 	"net/http"
 
+	commonMiddleware "github.com/OneKeyCoder/UIT-Go-Backend/common/middleware"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
-	commonMiddleware "github.com/OneKeyCoder/UIT-Go-Backend/common/middleware"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -14,10 +14,12 @@ func (app *Config) routes() http.Handler {
 	mux := chi.NewRouter()
 
 	// Add common middleware
+	// TODO: Re-enable LoggingMiddleware after debugging gRPC timeout
+	// mux.Use(commonMiddleware.LoggingMiddleware) // Structured logging with request context
 	mux.Use(commonMiddleware.Logger)
 	mux.Use(commonMiddleware.Recovery)
 	mux.Use(commonMiddleware.PrometheusMetrics("authentication-service"))
-	
+
 	// CORS configuration
 	mux.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"https://*", "http://*"},
@@ -43,6 +45,6 @@ func (app *Config) routes() http.Handler {
 	mux.Post("/refresh", app.RefreshToken)
 	mux.Post("/validate", app.ValidateToken)
 	mux.Patch("/change-password", app.ChangePassword)
-	
+
 	return mux
 }

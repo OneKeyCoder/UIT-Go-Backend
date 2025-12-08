@@ -1,0 +1,67 @@
+server:
+  http_listen_port: 3200
+  grpc_listen_port: 9096
+
+# Single instance mode (no ring)
+memberlist:
+  join_members: []
+
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+    zipkin:
+      endpoint: 0.0.0.0:9411
+    jaeger:
+      protocols:
+        thrift_http:
+          endpoint: 0.0.0.0:14268
+
+ingester:
+  max_block_duration: 5m
+  lifecycler:
+    ring:
+      replication_factor: 1
+
+compactor:
+  compaction:
+    block_retention: 1h
+  ring:
+    kvstore:
+      store: inmemory
+
+metrics_generator:
+  ring:
+    kvstore:
+      store: inmemory
+  processor:
+    service_graphs:
+      wait: 10s
+    span_metrics:
+      dimensions:
+        - http.method
+        - http.status_code
+  storage:
+    path: /var/tempo/generator/wal
+    remote_write:
+      - url: http://prometheus:9090/api/v1/write
+        send_exemplars: true
+
+storage:
+  trace:
+    backend: local
+    wal:
+      path: /var/tempo/wal
+    local:
+      path: /var/tempo/blocks
+
+query_frontend:
+  search:
+    max_duration: 0s
+
+overrides:
+  metrics_generator_processors: [service-graphs, span-metrics]
