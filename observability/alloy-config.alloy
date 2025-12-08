@@ -21,7 +21,7 @@ otelcol.receiver.otlp "default" {
 // ============================================================================
 otelcol.processor.batch "traces" {
   output {
-    traces = [otelcol.exporter.otlp.jaeger.input]
+    traces = [otelcol.exporter.otlp.tempo.input]
   }
 }
 
@@ -41,10 +41,10 @@ otelcol.processor.batch "logs" {
 // Exporters
 // ============================================================================
 
-// Jaeger - receives traces via OTLP
-otelcol.exporter.otlp "jaeger" {
+// Tempo - receives traces via OTLP
+otelcol.exporter.otlp "tempo" {
   client {
-    endpoint = "jaeger:4317"
+    endpoint = "tempo:4317"
     tls {
       insecure = true
     }

@@ -14,8 +14,10 @@ service LoggerService {
 }
 
 message LogRequest {
-  string name = 1;
-  string data = 2;
+  string event_name = 1; // Event type (e.g., "USER_LOGIN", "USER_REGISTRATION")
+  string actor_id = 2;   // Who performed the action (e.g., "user_123", "admin_456")
+  string metadata = 3;   // JSON string with structured context data
+  string status = 4;     // Event status: "success", "failure", "error"
 }
 
 message LogResponse {

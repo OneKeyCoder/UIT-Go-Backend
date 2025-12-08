@@ -2,20 +2,22 @@
 # Production-ready configuration with proper scrape intervals and alert rules
 
 global:
-  scrape_interval: 15s      # How often to scrape targets
-  evaluation_interval: 15s   # How often to evaluate rules
-  scrape_timeout: 10s       # Timeout for scrape requests
-  
+  scrape_interval: 15s # How often to scrape targets
+  evaluation_interval: 15s # How often to evaluate rules
+  scrape_timeout: 10s # Timeout for scrape requests
+
   # External labels for identifying this Prometheus instance
   external_labels:
-    cluster: 'uit-go-local'
-    environment: 'development'
+    cluster: "uit-go-local"
+    environment: "development"
 
-# Alertmanager configuration (for future integration)
-# alerting:
-#   alertmanagers:
-#     - static_configs:
-#         - targets: ['alertmanager:9093']
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
+      timeout: 10s
+      api_version: v2
 
 # Rule files for alerts
 rule_files:
@@ -24,15 +26,15 @@ rule_files:
 # Scrape configurations
 scrape_configs:
   # Self-monitoring
-  - job_name: 'prometheus'
+  - job_name: "prometheus"
     static_configs:
-      - targets: ['localhost:9090']
+      - targets: ["localhost:9090"]
     metrics_path: /metrics
 
   # API Gateway - main entry point
-  - job_name: 'api-gateway'
+  - job_name: "api-gateway"
     static_configs:
-      - targets: ['api-gateway:80']
+      - targets: ["api-gateway:80"]
     metrics_path: /metrics
     # Relabel to add service name
     relabel_configs:
@@ -42,9 +44,9 @@ scrape_configs:
         replacement: api-gateway
 
   # Authentication Service
-  - job_name: 'authentication-service'
+  - job_name: "authentication-service"
     static_configs:
-      - targets: ['authentication-service:80']
+      - targets: ["authentication-service:80"]
     metrics_path: /metrics
     relabel_configs:
       - source_labels: [__address__]
@@ -53,9 +55,9 @@ scrape_configs:
         replacement: authentication-service
 
   # Logger Service
-  - job_name: 'logger-service'
+  - job_name: "logger-service"
     static_configs:
-      - targets: ['logger-service:80']
+      - targets: ["logger-service:80"]
     metrics_path: /metrics
     relabel_configs:
       - source_labels: [__address__]
@@ -64,9 +66,9 @@ scrape_configs:
         replacement: logger-service
 
   # Location Service
-  - job_name: 'location-service'
+  - job_name: "location-service"
     static_configs:
-      - targets: ['location-service:80']
+      - targets: ["location-service:80"]
     metrics_path: /metrics
     relabel_configs:
       - source_labels: [__address__]
@@ -75,9 +77,9 @@ scrape_configs:
         replacement: location-service
 
   # Trip Service
-  - job_name: 'trip-service'
+  - job_name: "trip-service"
     static_configs:
-      - targets: ['trip-service:80']
+      - targets: ["trip-service:80"]
     metrics_path: /metrics
     relabel_configs:
       - source_labels: [__address__]
@@ -86,9 +88,9 @@ scrape_configs:
         replacement: trip-service
 
   # User Service
-  - job_name: 'user-service'
+  - job_name: "user-service"
     static_configs:
-      - targets: ['user-service:80']
+      - targets: ["user-service:80"]
     metrics_path: /metrics
     relabel_configs:
       - source_labels: [__address__]
@@ -97,15 +99,15 @@ scrape_configs:
         replacement: user-service
 
   # Jaeger - for tracing infrastructure health
-  - job_name: 'jaeger'
+  - job_name: "jaeger"
     static_configs:
-      - targets: ['jaeger:8888']
+      - targets: ["jaeger:8888"]
     metrics_path: /metrics
 
   # Loki - for logging infrastructure health
-  - job_name: 'loki'
+  - job_name: "loki"
     static_configs:
-      - targets: ['loki:3100']
+      - targets: ["loki:3100"]
     metrics_path: /metrics
 
   # Redis Exporter (if added)
