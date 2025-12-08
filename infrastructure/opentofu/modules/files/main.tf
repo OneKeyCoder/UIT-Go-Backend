@@ -1,5 +1,13 @@
+resource "random_string" "storage_account_name" {
+  length = 6
+  lower = true
+  numeric = true
+  special = false
+  upper = false
+}
+
 resource "azurerm_storage_account" "observability" {
-  name                     = "${var.resource_prefix}obssa"
+  name                     = "${random_string.storage_account_name.result}obssa"
   resource_group_name      = var.resource_group_name
   location                 = var.location
   account_tier             = "Standard"
