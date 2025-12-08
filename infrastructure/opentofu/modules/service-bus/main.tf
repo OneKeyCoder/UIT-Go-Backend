@@ -8,13 +8,6 @@ resource "azurerm_servicebus_namespace" "main" {
 
   local_auth_enabled = true
   public_network_access_enabled = true
-
-  network_rule_set {
-    default_action = "Deny"
-    network_rules {
-      subnet_id = var.aca_subnet_id
-    }
-  }
 }
 
 # Create the logs queue for log ingestion

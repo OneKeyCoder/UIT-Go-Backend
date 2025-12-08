@@ -170,6 +170,7 @@ services:
       RABBITMQ_DEFAULT_PASS: guest
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
+
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "ping"]
       interval: 10s
@@ -187,7 +188,7 @@ services:
       - "8888"
     restart: unless-stopped
     volumes:
-      - ./observability/config-badger.yml:/etc/jaeger/config.yaml:ro
+      - ./observability/config-badger.yml:/etc/jaeger/config.yaml:Z
       - jaeger-data:/badger
     command: ["--config", "/etc/jaeger/config.yaml"]
     healthcheck:
@@ -206,8 +207,8 @@ services:
       alertmanager:
         condition: service_healthy
     volumes:
-      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./observability/prometheus-alerts.yml:/etc/prometheus/alerts/prometheus-alerts.yml:ro
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:Z
+      - ./observability/prometheus-alerts.yml:/etc/prometheus/alerts/prometheus-alerts.yml:Z
       - prometheus-data:/prometheus
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
@@ -269,7 +270,7 @@ services:
       GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
     volumes:
       - grafana-data:/var/lib/grafana
-      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:Z
     healthcheck:
       test:
         ["CMD", "wget", "-q", "--spider", "http://localhost:3000/api/health"]
@@ -279,12 +280,13 @@ services:
 
   loki:
     image: grafana/loki:3.2.1
+    user: root
     restart: unless-stopped
     ports:
       - "3100:3100"
       - "9096:9096" # you forgot the gRPC port, should use this for internal log push
     volumes:
-      - ./observability/loki-config.yml:/etc/loki/local-config.yaml:ro
+      - ./observability/loki-config.yml:/etc/loki/local-config.yaml:Z
       - loki-data:/loki
     command: -config.file=/etc/loki/local-config.yaml
     healthcheck:
@@ -322,13 +324,8 @@ services:
       - "4317" # OTLP gRPC
       - "4318" # OTLP HTTP
     volumes:
-      - ./observability/alloy-config.alloy:/etc/alloy/config.alloy:ro
-    command:
-      [
-        "run",
-        "/etc/alloy/config.alloy",
-        "--server.http.listen-addr=0.0.0.0:12345",
-      ]
+      - ./observability/alloy-config.alloy:/etc/alloy/config.alloy:Z
+    command: ["run", "/etc/alloy/config.alloy", "--server.http.listen-addr=0.0.0.0:12345"]
     depends_on:
       loki:
         condition: service_healthy

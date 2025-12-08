@@ -37,6 +37,11 @@ resource "azurerm_key_vault" "keyvault" {
 # Grant Terraform service principal permissions to manage secrets
 resource "azurerm_role_assignment" "terraform_kv_admin" {
   scope                = azurerm_key_vault.keyvault.id
+  role_definition_name = "Key Vault Administrator"
+  principal_id         = data.azurerm_client_config.current.object_id
+}
+resource "azurerm_role_assignment" "terraform_kv_officer" {
+  scope                = azurerm_key_vault.keyvault.id
   role_definition_name = "Key Vault Secrets Officer"
   principal_id         = data.azurerm_client_config.current.object_id
 }
