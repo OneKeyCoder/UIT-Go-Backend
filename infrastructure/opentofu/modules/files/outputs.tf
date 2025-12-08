@@ -41,3 +41,8 @@ output "storage_key_secret_id" {
   value       = azurerm_key_vault_secret.storage_key.versionless_id
   sensitive   = true
 }
+output "storage_account_key" {
+  description = "Primary access key for the storage account"
+  value       = azurerm_storage_account.observability.primary_access_key
+  sensitive   = true
+}

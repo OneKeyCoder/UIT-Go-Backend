@@ -550,89 +550,89 @@ func (app *Config) GetReviewViaGRPC(ctx context.Context, tripID int, userID int)
 // ============================================
 
 func (app *Config) GetAllUsersViaGRPC(ctx context.Context) (*userpb.GetAllUsersResponse, error) {
-ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-defer cancel()
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
 
-req := &userpb.GetAllUsersRequest{}
-logger.Info("Calling user service GetAllUsers via gRPC")
+	req := &userpb.GetAllUsersRequest{}
+	logger.Info("Calling user service GetAllUsers via gRPC")
 
-resp, err := app.GRPCClients.UserClient.GetAllUsers(ctx, req)
-if err != nil {
-logger.Error("gRPC GetAllUsers failed", "error", err)
-return nil, err
-}
-return resp, nil
+	resp, err := app.GRPCClients.UserClient.GetAllUsers(ctx, req)
+	if err != nil {
+		logger.Error("gRPC GetAllUsers failed", "error", err)
+		return nil, err
+	}
+	return resp, nil
 }
 
 func (app *Config) GetUserByIdViaGRPC(ctx context.Context, userID int) (*userpb.GetUserByIdResponse, error) {
-ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-defer cancel()
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
 
-req := &userpb.GetUserByIdRequest{
-UserId: int32(userID),
-}
-logger.Info("Calling user service GetUserById via gRPC", "user_id", userID)
+	req := &userpb.GetUserByIdRequest{
+		UserId: int32(userID),
+	}
+	logger.Info("Calling user service GetUserById via gRPC", "user_id", userID)
 
-resp, err := app.GRPCClients.UserClient.GetUserById(ctx, req)
-if err != nil {
-logger.Error("gRPC GetUserById failed", "error", err)
-return nil, err
-}
-return resp, nil
+	resp, err := app.GRPCClients.UserClient.GetUserById(ctx, req)
+	if err != nil {
+		logger.Error("gRPC GetUserById failed", "error", err)
+		return nil, err
+	}
+	return resp, nil
 }
 
 func (app *Config) CreateUserViaGRPC(ctx context.Context, email string) (*userpb.CreateUserResponse, error) {
-ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-defer cancel()
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
 
-req := &userpb.CreateUserRequest{
-Email: email,
-}
-logger.Info("Calling user service CreateUser via gRPC", "email", email)
+	req := &userpb.CreateUserRequest{
+		Email: email,
+	}
+	logger.Info("Calling user service CreateUser via gRPC", "email", email)
 
-resp, err := app.GRPCClients.UserClient.CreateUser(ctx, req)
-if err != nil {
-logger.Error("gRPC CreateUser failed", "error", err)
-return nil, err
-}
-return resp, nil
+	resp, err := app.GRPCClients.UserClient.CreateUser(ctx, req)
+	if err != nil {
+		logger.Error("gRPC CreateUser failed", "error", err)
+		return nil, err
+	}
+	return resp, nil
 }
 
 func (app *Config) UpdateUserViaGRPC(ctx context.Context, userID int, email, role, driverStatus string) (*userpb.UpdateUserResponse, error) {
-ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-defer cancel()
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
 
-req := &userpb.UpdateUserRequest{
-UserId:       int32(userID),
-Email:        email,
-Role:         role,
-DriverStatus: driverStatus,
-}
-logger.Info("Calling user service UpdateUser via gRPC", "user_id", userID)
+	req := &userpb.UpdateUserRequest{
+		UserId:       int32(userID),
+		Email:        email,
+		Role:         role,
+		DriverStatus: driverStatus,
+	}
+	logger.Info("Calling user service UpdateUser via gRPC", "user_id", userID)
 
-resp, err := app.GRPCClients.UserClient.UpdateUser(ctx, req)
-if err != nil {
-logger.Error("gRPC UpdateUser failed", "error", err)
-return nil, err
-}
-return resp, nil
+	resp, err := app.GRPCClients.UserClient.UpdateUser(ctx, req)
+	if err != nil {
+		logger.Error("gRPC UpdateUser failed", "error", err)
+		return nil, err
+	}
+	return resp, nil
 }
 
 func (app *Config) DeleteUserViaGRPC(ctx context.Context, userID int) (*userpb.DeleteUserResponse, error) {
-ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-defer cancel()
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
 
-req := &userpb.DeleteUserRequest{
-UserId: int32(userID),
-}
-logger.Info("Calling user service DeleteUser via gRPC", "user_id", userID)
+	req := &userpb.DeleteUserRequest{
+		UserId: int32(userID),
+	}
+	logger.Info("Calling user service DeleteUser via gRPC", "user_id", userID)
 
-resp, err := app.GRPCClients.UserClient.DeleteUser(ctx, req)
-if err != nil {
-logger.Error("gRPC DeleteUser failed", "error", err)
-return nil, err
-}
-return resp, nil
+	resp, err := app.GRPCClients.UserClient.DeleteUser(ctx, req)
+	if err != nil {
+		logger.Error("gRPC DeleteUser failed", "error", err)
+		return nil, err
+	}
+	return resp, nil
 }
 
 // ============================================
@@ -640,109 +640,109 @@ return resp, nil
 // ============================================
 
 func (app *Config) GetAllVehiclesViaGRPC(ctx context.Context) (*userpb.GetAllVehiclesResponse, error) {
-ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-defer cancel()
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
 
-req := &userpb.GetAllVehiclesRequest{}
-logger.Info("Calling user service GetAllVehicles via gRPC")
+	req := &userpb.GetAllVehiclesRequest{}
+	logger.Info("Calling user service GetAllVehicles via gRPC")
 
-resp, err := app.GRPCClients.UserClient.GetAllVehicles(ctx, req)
-if err != nil {
-logger.Error("gRPC GetAllVehicles failed", "error", err)
-return nil, err
-}
-return resp, nil
+	resp, err := app.GRPCClients.UserClient.GetAllVehicles(ctx, req)
+	if err != nil {
+		logger.Error("gRPC GetAllVehicles failed", "error", err)
+		return nil, err
+	}
+	return resp, nil
 }
 
 func (app *Config) GetVehicleByIdViaGRPC(ctx context.Context, vehicleID int) (*userpb.GetVehicleByIdResponse, error) {
-ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-defer cancel()
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
 
-req := &userpb.GetVehicleByIdRequest{
-VehicleId: int32(vehicleID),
-}
-logger.Info("Calling user service GetVehicleById via gRPC", "vehicle_id", vehicleID)
+	req := &userpb.GetVehicleByIdRequest{
+		VehicleId: int32(vehicleID),
+	}
+	logger.Info("Calling user service GetVehicleById via gRPC", "vehicle_id", vehicleID)
 
-resp, err := app.GRPCClients.UserClient.GetVehicleById(ctx, req)
-if err != nil {
-logger.Error("gRPC GetVehicleById failed", "error", err)
-return nil, err
-}
-return resp, nil
+	resp, err := app.GRPCClients.UserClient.GetVehicleById(ctx, req)
+	if err != nil {
+		logger.Error("gRPC GetVehicleById failed", "error", err)
+		return nil, err
+	}
+	return resp, nil
 }
 
 func (app *Config) GetVehiclesByUserIdViaGRPC(ctx context.Context, userID int) (*userpb.GetVehiclesByUserIdResponse, error) {
-ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-defer cancel()
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
 
-req := &userpb.GetVehiclesByUserIdRequest{
-UserId: int32(userID),
-}
-logger.Info("Calling user service GetVehiclesByUserId via gRPC", "user_id", userID)
+	req := &userpb.GetVehiclesByUserIdRequest{
+		UserId: int32(userID),
+	}
+	logger.Info("Calling user service GetVehiclesByUserId via gRPC", "user_id", userID)
 
-resp, err := app.GRPCClients.UserClient.GetVehiclesByUserId(ctx, req)
-if err != nil {
-logger.Error("gRPC GetVehiclesByUserId failed", "error", err)
-return nil, err
-}
-return resp, nil
+	resp, err := app.GRPCClients.UserClient.GetVehiclesByUserId(ctx, req)
+	if err != nil {
+		logger.Error("gRPC GetVehiclesByUserId failed", "error", err)
+		return nil, err
+	}
+	return resp, nil
 }
 
 func (app *Config) CreateVehicleViaGRPC(ctx context.Context, driverID int, licensePlate, vehicleType string, seats int, status string) (*userpb.CreateVehicleResponse, error) {
-ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-defer cancel()
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
 
-req := &userpb.CreateVehicleRequest{
-DriverId:     int32(driverID),
-LicensePlate: licensePlate,
-VehicleType:  vehicleType,
-Seats:        int32(seats),
-Status:       status,
-}
-logger.Info("Calling user service CreateVehicle via gRPC", "driver_id", driverID)
+	req := &userpb.CreateVehicleRequest{
+		DriverId:     int32(driverID),
+		LicensePlate: licensePlate,
+		VehicleType:  vehicleType,
+		Seats:        int32(seats),
+		Status:       status,
+	}
+	logger.Info("Calling user service CreateVehicle via gRPC", "driver_id", driverID)
 
-resp, err := app.GRPCClients.UserClient.CreateVehicle(ctx, req)
-if err != nil {
-logger.Error("gRPC CreateVehicle failed", "error", err)
-return nil, err
-}
-return resp, nil
+	resp, err := app.GRPCClients.UserClient.CreateVehicle(ctx, req)
+	if err != nil {
+		logger.Error("gRPC CreateVehicle failed", "error", err)
+		return nil, err
+	}
+	return resp, nil
 }
 
 func (app *Config) UpdateVehicleViaGRPC(ctx context.Context, vehicleID int, licensePlate, vehicleType string, seats int, status string) (*userpb.UpdateVehicleResponse, error) {
-ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-defer cancel()
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
 
-req := &userpb.UpdateVehicleRequest{
-VehicleId:    int32(vehicleID),
-LicensePlate: licensePlate,
-VehicleType:  vehicleType,
-Seats:        int32(seats),
-Status:       status,
-}
-logger.Info("Calling user service UpdateVehicle via gRPC", "vehicle_id", vehicleID)
+	req := &userpb.UpdateVehicleRequest{
+		VehicleId:    int32(vehicleID),
+		LicensePlate: licensePlate,
+		VehicleType:  vehicleType,
+		Seats:        int32(seats),
+		Status:       status,
+	}
+	logger.Info("Calling user service UpdateVehicle via gRPC", "vehicle_id", vehicleID)
 
-resp, err := app.GRPCClients.UserClient.UpdateVehicle(ctx, req)
-if err != nil {
-logger.Error("gRPC UpdateVehicle failed", "error", err)
-return nil, err
-}
-return resp, nil
+	resp, err := app.GRPCClients.UserClient.UpdateVehicle(ctx, req)
+	if err != nil {
+		logger.Error("gRPC UpdateVehicle failed", "error", err)
+		return nil, err
+	}
+	return resp, nil
 }
 
 func (app *Config) DeleteVehicleViaGRPC(ctx context.Context, vehicleID int) (*userpb.DeleteVehicleResponse, error) {
-ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-defer cancel()
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
 
-req := &userpb.DeleteVehicleRequest{
-VehicleId: int32(vehicleID),
-}
-logger.Info("Calling user service DeleteVehicle via gRPC", "vehicle_id", vehicleID)
+	req := &userpb.DeleteVehicleRequest{
+		VehicleId: int32(vehicleID),
+	}
+	logger.Info("Calling user service DeleteVehicle via gRPC", "vehicle_id", vehicleID)
 
-resp, err := app.GRPCClients.UserClient.DeleteVehicle(ctx, req)
-if err != nil {
-logger.Error("gRPC DeleteVehicle failed", "error", err)
-return nil, err
-}
-return resp, nil
+	resp, err := app.GRPCClients.UserClient.DeleteVehicle(ctx, req)
+	if err != nil {
+		logger.Error("gRPC DeleteVehicle failed", "error", err)
+		return nil, err
+	}
+	return resp, nil
 }

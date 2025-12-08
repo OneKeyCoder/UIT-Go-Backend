@@ -18,6 +18,41 @@ var (
 	serviceName string
 )
 
+// filteringOTLPHandler wraps OTLP handler with configurable level filtering
+// Log Levels (from lowest to highest severity):
+// - DEBUG: Detailed information for debugging (development/staging only)
+// - INFO: Confirmation that things are working as expected
+// - WARN: Something unexpected but system still functioning
+// - ERROR: Error occurred, feature broken but system still running
+// - FATAL: Critical error, application crash or cannot serve
+type filteringOTLPHandler struct {
+	handler  slog.Handler
+	minLevel slog.Level
+}
+
+func (f *filteringOTLPHandler) Enabled(ctx context.Context, level slog.Level) bool {
+	// Filter based on configured minimum level
+	return level >= f.minLevel
+}
+
+func (f *filteringOTLPHandler) Handle(ctx context.Context, r slog.Record) error {
+	return f.handler.Handle(ctx, r)
+}
+
+func (f *filteringOTLPHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	return &filteringOTLPHandler{
+		handler:  f.handler.WithAttrs(attrs),
+		minLevel: f.minLevel,
+	}
+}
+
+func (f *filteringOTLPHandler) WithGroup(name string) slog.Handler {
+	return &filteringOTLPHandler{
+		handler:  f.handler.WithGroup(name),
+		minLevel: f.minLevel,
+	}
+}
+
 // Init initializes the global logger with OTLP backend
 // Must be called AFTER telemetry.InitTracer() to use OTLP export
 func Init(service string, isDevelopment bool) error {
@@ -66,18 +101,17 @@ func InitDefault(service string) {
 	}
 }
 
-
 // WithContext returns logger with trace context if available
 func WithContext(ctx context.Context) *slog.Logger {
 	if Log == nil {
 		return slog.Default()
 	}
-	
+
 	span := trace.SpanFromContext(ctx)
 	if !span.IsRecording() {
 		return Log
 	}
-	
+
 	spanCtx := span.SpanContext()
 	return Log.With(
 		"trace_id", spanCtx.TraceID().String(),
@@ -159,10 +193,20 @@ func Debug(msg string, args ...any) {
 	}
 }
 
-// Fatal logs a fatal message and exits
+// Fatal logs a fatal message at ERROR+4 level and exits
+// FATAL indicates critical errors that cause application crash
 func Fatal(msg string, args ...any) {
 	if Log != nil {
-		Log.Error(msg, args...)
+		// Log at ERROR+4 level (equivalent to FATAL/CRITICAL)
+		Log.Log(context.Background(), slog.LevelError+4, msg, args...)
+	}
+	os.Exit(1)
+}
+
+// FatalCtx logs a fatal message with trace context and exits
+func FatalCtx(ctx context.Context, msg string, args ...any) {
+	if Log != nil {
+		WithContext(ctx).Log(ctx, slog.LevelError+4, msg, args...)
 	}
 	os.Exit(1)
 }
@@ -285,4 +329,33 @@ func RequestWarn(msg string, args ...any) {
 	if Log != nil {
 		Log.Warn(msg, append(args, "log_type", "request")...)
 	}
+// RequestLogger creates a logger with HTTP request context
+// Includes: method, path, remote_addr, user_agent, request_id
+func RequestLogger(ctx context.Context, method, path, remoteAddr, userAgent, requestID string) *slog.Logger {
+	logger := WithContext(ctx).With(
+		"method", method,
+		"path", path,
+		"remote_addr", remoteAddr,
+		"user_agent", userAgent,
+		"request_id", requestID,
+	)
+	return logger
+}
+
+// GRPCLogger creates a logger with gRPC context
+// Includes: grpc_method, peer_addr
+func GRPCLogger(ctx context.Context, method, peerAddr string) *slog.Logger {
+	logger := WithContext(ctx).With(
+		"grpc_method", method,
+		"peer_addr", peerAddr,
+		"protocol", "grpc",
+	)
+	return logger
+}
+
+// ErrorWithStack logs error with full context and stack trace hint
+func ErrorWithStack(ctx context.Context, msg string, err error, extraFields ...any) {
+	fields := []any{"error", err.Error()}
+	fields = append(fields, extraFields...)
+	WithContext(ctx).ErrorContext(ctx, msg, fields...)
 }

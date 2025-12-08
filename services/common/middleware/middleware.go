@@ -72,16 +72,16 @@ func GetRequestID(ctx context.Context) string {
 func Logger(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
-		
+
 		// Create a custom response writer to capture status code
 		wrapped := &responseWriter{ResponseWriter: w, statusCode: http.StatusOK}
-		
+
 		next.ServeHTTP(wrapped, r)
-		
+
 		if shouldSkipLog(r.URL.Path) {
 			return
 		}
-		
+
 		duration := time.Since(start)
 		
 		// Extract trace ID and request ID from context
@@ -147,7 +147,7 @@ func Recovery(next http.Handler) http.Handler {
 				response.InternalServerError(w, "Internal server error")
 			}
 		}()
-		
+
 		next.ServeHTTP(w, r)
 	})
 }

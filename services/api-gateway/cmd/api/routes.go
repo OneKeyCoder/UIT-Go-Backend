@@ -31,11 +31,9 @@ func (app *Config) routes() http.Handler {
 		MaxAge:           300,
 	}))
 
-	// Rate limiting: 100 requests per minute per IP
-	// Applied to all routes after other middleware
-	lmt := tollbooth.NewLimiter(100.0/60.0, nil)
-	// Allow short bursts so probes or short spikes don't immediately get 429
-	lmt.SetBurst(100)
+	lmt := tollbooth.NewLimiter(1000.0/60.0, nil)
+	// Allow bursts for concurrent load testing
+	lmt.SetBurst(1000)
 	lmt.SetIPLookups([]string{"X-Forwarded-For", "X-Real-IP", "RemoteAddr"})
 	mux.Use(func(next http.Handler) http.Handler {
 		return tollbooth.LimitHandler(lmt, next)

@@ -32,11 +32,11 @@ datasources:
         # Link trace_id in logs to Tempo traces
         - name: TraceID
           matcherRegex: '"trace_id":"([a-f0-9]+)"'
-          url: '$${__value.raw}'
+          url: "$${__value.raw}"
           datasourceUid: tempo
           urlDisplayLabel: View Trace
 
-  # Tempo - for traces
+  # Tempo - for distributed traces (primary)
   - name: Tempo
     type: tempo
     uid: tempo
@@ -44,7 +44,6 @@ datasources:
     url: http://tempo:3200
     editable: false
     jsonData:
-      httpMethod: GET
       tracesToLogsV2:
         datasourceUid: loki
         spanStartTimeShift: "-1h"
@@ -65,3 +64,12 @@ datasources:
             query: 'sum(rate(http_requests_total{service="$${__tags.service}"}[5m]))'
           - name: Error rate
             query: 'sum(rate(http_requests_total{service="$${__tags.service}", status=~"5.."}[5m])) / sum(rate(http_requests_total{service="$${__tags.service}"}[5m]))'
+      # nodeGraph:
+      #   enabled: true
+      # serviceMap:
+      #   datasourceUid: prometheus
+      # search:
+      #   hide: false
+      # lokiSearch:
+      #   datasourceUid: loki
+      # Don't know what this is so i will put it here for later stuff
