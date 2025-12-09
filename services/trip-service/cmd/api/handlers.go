@@ -48,7 +48,7 @@ func (app *Config) CreateTrip(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tripRecord, duration, err := app.TripService.CreateTrip(tripRequest)
+	tripRecord, duration, err := app.TripService.CreateTrip(r.Context(), tripRequest)
 	if err != nil {
 		response.BadRequest(w, err.Error())
 		return

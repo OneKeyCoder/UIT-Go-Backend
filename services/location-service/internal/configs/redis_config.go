@@ -9,6 +9,7 @@ import (
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/env"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/logger"
 	"github.com/redis/go-redis/v9"
+	"github.com/redis/go-redis/extra/redisotel/v9"
 )
 
 type RedisConfig struct {
@@ -49,6 +50,11 @@ func ConnectRedis() (*redis.Client, error) {
 		Password: config.Password,
 		DB:       config.DB,
 	})
+
+	// Enable OpenTelemetry instrumentation
+	if err := redisotel.InstrumentTracing(client); err != nil {
+		return nil, fmt.Errorf("failed to instrument Redis with OpenTelemetry: %w", err)
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

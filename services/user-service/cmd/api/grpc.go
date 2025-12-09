@@ -7,10 +7,11 @@ import (
 
 	user_service "user-service/internal"
 
-	"github.com/OneKeyCoder/UIT-Go-Backend/common/grpcutil"
+
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/logger"
 	pb "github.com/OneKeyCoder/UIT-Go-Backend/proto/user"
 
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 )
 
@@ -30,7 +31,7 @@ func (s *UserServer) GetUserById(ctx context.Context, req *pb.GetUserByIdRequest
 
 	user, err := s.service.GetUserById(ctx, int(req.UserId))
 	if err != nil {
-		logger.Error("Failed to get user", "error", err)
+		logger.WithContext(ctx).ErrorContext(ctx, "Failed to get user", "error", err)
 		return &pb.GetUserByIdResponse{
 			Success: false,
 			Message: err.Error(),
@@ -58,11 +59,9 @@ func (s *UserServer) GetUserById(ctx context.Context, req *pb.GetUserByIdRequest
 }
 
 func (s *UserServer) GetAllUsers(ctx context.Context, req *pb.GetAllUsersRequest) (*pb.GetAllUsersResponse, error) {
-	logger.Info("gRPC GetAllUsers called")
-
 	users, err := s.service.GetAllUsers(ctx)
 	if err != nil {
-		logger.Error("Failed to get all users", "error", err)
+		logger.WithContext(ctx).ErrorContext(ctx, "Failed to get all users", "error", err)
 		return &pb.GetAllUsersResponse{
 			Success: false,
 			Message: err.Error(),
@@ -96,7 +95,7 @@ func (s *UserServer) GetAllUsers(ctx context.Context, req *pb.GetAllUsersRequest
 }
 
 func (s *UserServer) CreateUser(ctx context.Context, req *pb.CreateUserRequest) (*pb.CreateUserResponse, error) {
-	logger.Info("gRPC CreateUser called", "email", req.Email)
+	logger.WithContext(ctx).InfoContext(ctx, "gRPC CreateUser called", "email", req.Email)
 
 	userReq := user_service.UserRequest{
 		Email:     req.Email,
@@ -106,7 +105,7 @@ func (s *UserServer) CreateUser(ctx context.Context, req *pb.CreateUserRequest) 
 
 	err := s.service.CreateUser(ctx, userReq)
 	if err != nil {
-		logger.Error("Failed to create user", "error", err)
+		logger.WithContext(ctx).ErrorContext(ctx, "Failed to create user", "error", err)
 		return &pb.CreateUserResponse{
 			Success: false,
 			Message: err.Error(),
@@ -130,7 +129,7 @@ func (s *UserServer) UpdateUser(ctx context.Context, req *pb.UpdateUserRequest) 
 
 	err := s.service.UpdateUserById(ctx, int(req.UserId), userRequest)
 	if err != nil {
-		logger.Error("Failed to update user", "error", err)
+		logger.WithContext(ctx).ErrorContext(ctx, "Failed to update user", "error", err)
 		return &pb.UpdateUserResponse{
 			Success: false,
 			Message: err.Error(),
@@ -148,7 +147,7 @@ func (s *UserServer) DeleteUser(ctx context.Context, req *pb.DeleteUserRequest) 
 
 	err := s.service.DeleteUserById(ctx, int(req.UserId))
 	if err != nil {
-		logger.Error("Failed to delete user", "error", err)
+		logger.WithContext(ctx).ErrorContext(ctx, "Failed to delete user", "error", err)
 		return &pb.DeleteUserResponse{
 			Success: false,
 			Message: err.Error(),
@@ -170,7 +169,7 @@ func (s *UserServer) GetVehicleById(ctx context.Context, req *pb.GetVehicleByIdR
 
 	vehicle, err := s.service.GetVehicleById(ctx, int(req.VehicleId))
 	if err != nil {
-		logger.Error("Failed to get vehicle", "error", err)
+		logger.WithContext(ctx).ErrorContext(ctx, "Failed to get vehicle", "error", err)
 		return &pb.GetVehicleByIdResponse{
 			Success: false,
 			Message: err.Error(),
@@ -199,7 +198,7 @@ func (s *UserServer) GetVehiclesByUserId(ctx context.Context, req *pb.GetVehicle
 
 	vehicles, err := s.service.GetVehiclesByUserId(ctx, int(req.UserId))
 	if err != nil {
-		logger.Error("Failed to get vehicles by user id", "error", err)
+		logger.WithContext(ctx).ErrorContext(ctx, "Failed to get vehicles by user id", "error", err)
 		return &pb.GetVehiclesByUserIdResponse{
 			Success: false,
 			Message: err.Error(),
@@ -230,11 +229,9 @@ func (s *UserServer) GetVehiclesByUserId(ctx context.Context, req *pb.GetVehicle
 }
 
 func (s *UserServer) GetAllVehicles(ctx context.Context, req *pb.GetAllVehiclesRequest) (*pb.GetAllVehiclesResponse, error) {
-	logger.Info("gRPC GetAllVehicles called")
-
 	vehicles, err := s.service.GetAllVehicles(ctx)
 	if err != nil {
-		logger.Error("Failed to get all vehicles", "error", err)
+		logger.WithContext(ctx).ErrorContext(ctx, "Failed to get all vehicles", "error", err)
 		return &pb.GetAllVehiclesResponse{
 			Success: false,
 			Message: err.Error(),
@@ -265,10 +262,6 @@ func (s *UserServer) GetAllVehicles(ctx context.Context, req *pb.GetAllVehiclesR
 }
 
 func (s *UserServer) CreateVehicle(ctx context.Context, req *pb.CreateVehicleRequest) (*pb.CreateVehicleResponse, error) {
-	logger.Info("gRPC CreateVehicle called",
-		"driver_id", req.DriverId,
-		"license_plate", req.LicensePlate)
-
 	vehicleRequest := user_service.VehicleRequest{
 		LicensePlate: req.LicensePlate,
 		VehicleType:  req.VehicleType,
@@ -278,7 +271,7 @@ func (s *UserServer) CreateVehicle(ctx context.Context, req *pb.CreateVehicleReq
 
 	vehicle, err := s.service.CreateVehicle(ctx, int(req.DriverId), vehicleRequest)
 	if err != nil {
-		logger.Error("Failed to create vehicle", "error", err)
+		logger.WithContext(ctx).ErrorContext(ctx, "Failed to create vehicle", "error", err)
 		return &pb.CreateVehicleResponse{
 			Success: false,
 			Message: err.Error(),
@@ -314,7 +307,7 @@ func (s *UserServer) UpdateVehicle(ctx context.Context, req *pb.UpdateVehicleReq
 
 	vehicle, err := s.service.UpdateVehicle(ctx, int(req.VehicleId), vehicleRequest)
 	if err != nil {
-		logger.Error("Failed to update vehicle", "error", err)
+		logger.WithContext(ctx).ErrorContext(ctx, "Failed to update vehicle", "error", err)
 		return &pb.UpdateVehicleResponse{
 			Success: false,
 			Message: err.Error(),
@@ -343,7 +336,7 @@ func (s *UserServer) DeleteVehicle(ctx context.Context, req *pb.DeleteVehicleReq
 
 	err := s.service.DeleteVehicleById(ctx, int(req.VehicleId))
 	if err != nil {
-		logger.Error("Failed to delete vehicle", "error", err)
+		logger.WithContext(ctx).ErrorContext(ctx, "Failed to delete vehicle", "error", err)
 		return &pb.DeleteVehicleResponse{
 			Success: false,
 			Message: err.Error(),
@@ -367,14 +360,14 @@ func startGRPCServer(userService *user_service.UserService) {
 	}
 
 	s := grpc.NewServer(
-		grpc.UnaryInterceptor(grpcutil.UnaryServerInterceptor()),
+		grpc.StatsHandler(otelgrpc.NewServerHandler()),
 	)
 
 	pb.RegisterUserServiceServer(s, &UserServer{
 		service: userService,
 	})
 
-	logger.Info("Starting gRPC server", "port", grpcPort)
+	logger.AppInfo("Starting gRPC server", "port", grpcPort)
 
 	if err := s.Serve(lis); err != nil {
 		logger.Fatal("Failed to serve gRPC", "error", err)

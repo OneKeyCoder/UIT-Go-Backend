@@ -36,7 +36,7 @@ groups:
             
             **Immediate Action Required:**
             1. Check recent deployments
-            2. Review Jaeger traces for failing requests
+            2. Review Tempo traces for failing requests
             3. Check dependent service health
           runbook_url: "https://github.com/OneKeyCoder/UIT-Go-Backend/blob/master/docs/runbooks/high-error-rate.md"
 
@@ -62,6 +62,7 @@ groups:
             1. Investigate error patterns in logs
             2. Check for degraded dependencies
             3. Review recent configuration changes
+          runbook_url: "https://github.com/OneKeyCoder/UIT-Go-Backend/blob/master/observability/runbooks/high-error-rate.md"
 
       # Error budget nearly exhausted
       - alert: SLO_ErrorBudgetLow
@@ -106,7 +107,7 @@ groups:
             SLO target: 500ms
             
             **Debug Steps:**
-            1. Check Jaeger for slow traces
+            1. Check Tempo for slow traces
             2. Review downstream service latencies
             3. Check for resource contention (CPU/Memory)
 
@@ -174,6 +175,7 @@ groups:
             1. Check container status: `docker ps -a | grep {{ $labels.job }}`
             2. Check container logs: `docker logs uit-go-{{ $labels.job }}-1`
             3. Check resource usage on host
+          runbook_url: "https://github.com/OneKeyCoder/UIT-Go-Backend/blob/master/observability/runbooks/service-down.md"
 
       - alert: HighMemoryUsage
         expr: |
@@ -253,11 +255,13 @@ groups:
         for: 2m
         labels:
           severity: critical
+          service: rabbitmq
         annotations:
           summary: "🐰 RabbitMQ metrics unavailable"
           description: |
             Cannot collect RabbitMQ metrics. Message queue may be down.
             This affects async logging and event processing.
+          runbook_url: "https://github.com/OneKeyCoder/UIT-Go-Backend/blob/master/observability/runbooks"
 
       - alert: HighInFlightRequests
         expr: |

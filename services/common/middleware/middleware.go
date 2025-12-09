@@ -1,6 +1,8 @@
 package middleware
 
 import (
+	"context"
+	"fmt"
 	"net/http"
 	"runtime/debug"
 	"strings"
@@ -8,6 +10,16 @@ import (
 
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/logger"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/response"
+	"github.com/google/uuid"
+	"go.opentelemetry.io/otel/trace"
+)
+
+// ContextKey type for request context keys
+type contextKey string
+
+const (
+	// RequestIDKey is the context key for request ID
+	RequestIDKey contextKey = "request_id"
 )
 
 // skipLogPaths are paths that should not be logged (health checks, metrics)
@@ -31,49 +43,93 @@ func shouldSkipLog(path string) bool {
 	return false
 }
 
+// RequestID middleware generates a unique request ID and adds it to context
+func RequestID(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Check if request ID already exists in header (from upstream)
+		requestID := r.Header.Get("X-Request-ID")
+		if requestID == "" {
+			requestID = uuid.New().String()
+		}
+		
+		// Add request ID to response header for debugging
+		w.Header().Set("X-Request-ID", requestID)
+		
+		// Add request ID to context
+		ctx := context.WithValue(r.Context(), RequestIDKey, requestID)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+// GetRequestID extracts request ID from context
+func GetRequestID(ctx context.Context) string {
+	if id, ok := ctx.Value(RequestIDKey).(string); ok {
+		return id
+	}
+	return ""
+}
+
 // Logger middleware logs HTTP requests with structured logging
 func Logger(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
-		
+
 		// Create a custom response writer to capture status code
 		wrapped := &responseWriter{ResponseWriter: w, statusCode: http.StatusOK}
-		
+
 		next.ServeHTTP(wrapped, r)
-		
+
 		if shouldSkipLog(r.URL.Path) {
 			return
 		}
-		
+
 		duration := time.Since(start)
 		
-		// Log based on status code level
+		// Extract trace ID and request ID from context
+		traceID := ""
+		spanID := ""
+		if span := trace.SpanFromContext(r.Context()); span.SpanContext().IsValid() {
+			traceID = span.SpanContext().TraceID().String()
+			spanID = span.SpanContext().SpanID().String()
+		}
+		
+		requestID := GetRequestID(r.Context())
+		
+		// Log based on status code level using Request log type with request_id
+		// Include trace_id in message for Grafana derivedFields to match
 		if wrapped.statusCode >= 500 {
-			logger.Error("HTTP request",
+			logger.RequestError(fmt.Sprintf("HTTP request [trace_id=%s]", traceID),
 				"method", r.Method,
 				"path", r.RequestURI,
 				"status", wrapped.statusCode,
-				"duration", duration,
+				"duration_ms", duration.Milliseconds(),
 				"remote_addr", r.RemoteAddr,
 				"user_agent", r.UserAgent(),
+				"trace_id", traceID,
+				"span_id", spanID,
+				"request_id", requestID,
 			)
 		} else if wrapped.statusCode >= 400 {
-			logger.Warn("HTTP request",
+			logger.RequestWarn(fmt.Sprintf("HTTP request [trace_id=%s]", traceID),
 				"method", r.Method,
 				"path", r.RequestURI,
 				"status", wrapped.statusCode,
-				"duration", duration,
+				"duration_ms", duration.Milliseconds(),
 				"remote_addr", r.RemoteAddr,
 				"user_agent", r.UserAgent(),
+				"trace_id", traceID,
+				"span_id", spanID,
+				"request_id", requestID,
 			)
 		} else {
-			logger.Info("HTTP request",
+			logger.RequestInfo(fmt.Sprintf("HTTP request [trace_id=%s]", traceID),
 				"method", r.Method,
 				"path", r.RequestURI,
 				"status", wrapped.statusCode,
-				"duration", duration,
-				"remote_addr", r.RemoteAddr,
-				"user_agent", r.UserAgent(),
+				"duration_ms", duration.Milliseconds(),
+				"trace_id", traceID,
+				"span_id", spanID,
+				"request_id", requestID,
 			)
 		}
 	})
@@ -84,7 +140,7 @@ func Recovery(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if err := recover(); err != nil {
-				logger.Error("Panic recovered",
+				logger.AppError("Panic recovered",
 					"error", err,
 					"stack", string(debug.Stack()),
 					"method", r.Method,
@@ -93,7 +149,7 @@ func Recovery(next http.Handler) http.Handler {
 				response.InternalServerError(w, "Internal server error")
 			}
 		}()
-		
+
 		next.ServeHTTP(w, r)
 	})
 }

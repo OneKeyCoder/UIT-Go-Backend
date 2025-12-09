@@ -48,10 +48,10 @@ func main() {
 
 	// Initialize logger AFTER telemetry (to pick up OTLP provider)
 	logger.InitDefault(serviceName)
-	logger.Info("Starting User Service", "version", serviceVersion)
+	logger.AppInfo("Starting User Service", "version", serviceVersion)
 
 	// Initialize MongoDB
-	logger.Info("Connecting to MongoDB...")
+	logger.AppInfo("Connecting to MongoDB...")
 	err = configs.InitMongo()
 	if err != nil {
 		logger.Fatal("Failed to connect to MongoDB", "error", err)
@@ -84,7 +84,7 @@ func main() {
 
 	// Start server in goroutine
 	go func() {
-		logger.Info("Starting HTTP server", "port", webPort)
+		logger.AppInfo("Starting HTTP server", "port", webPort)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			logger.Fatal("Failed to start HTTP server", "error", err)
 		}

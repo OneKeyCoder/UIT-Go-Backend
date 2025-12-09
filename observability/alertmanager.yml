@@ -1,0 +1,59 @@
+global:
+  resolve_timeout: 5m
+  smtp_smarthost: 'smtp.gmail.com:587'
+  smtp_from: 'lyhuavanly@gmail.com'
+  smtp_auth_username: 'lyhuavanly@gmail.com'
+  smtp_auth_password: 'put your app password here'
+  smtp_require_tls: true
+
+route:
+  receiver: gmail-alerts
+  group_by: ['alertname']
+  group_wait: 30s
+  group_interval: 10m
+  repeat_interval: 4h
+
+  routes:
+    # Critical alerts - immediate notification
+    - match:
+        severity: critical
+      receiver: gmail-alerts
+      group_wait: 10s
+      group_interval: 5m
+      repeat_interval: 1h
+      group_by: ['alertname']
+    
+    # Warning alerts - batched notification
+    - match:
+        severity: warning
+      receiver: gmail-alerts
+      group_wait: 5m
+      group_interval: 30m
+      repeat_interval: 12h
+      group_by: ['alertname']
+
+receivers:
+  - name: gmail-alerts
+    email_configs:
+      - to: 'lyhuavanly@gmail.com'
+        send_resolved: true
+        headers:
+          subject: '[UIT-Go] {{ .GroupLabels.alertname }} - {{ .GroupLabels.service }}'
+        html: |
+          <h3>{{ .GroupLabels.alertname }} ({{ .Status }})</h3>
+          <p><strong>Service:</strong> {{ .GroupLabels.service }}<br/>
+          <strong>Count:</strong> {{ len .Alerts }} alert(s)</p>
+          {{ range .Alerts }}
+          <hr/>
+          <p><strong>Severity:</strong> {{ .Labels.severity }}<br/>
+          <strong>Description:</strong> {{ .Annotations.description }}<br/>
+          <strong>Runbook:</strong> <a href="{{ .Annotations.runbook_url }}">{{ .Annotations.runbook_url }}</a><br/>
+          <strong>Time:</strong> {{ .StartsAt.Format "15:04:05" }}</p>
+          {{ end }}
+
+inhibit_rules:
+  - source_match:
+      severity: critical
+    target_match:
+      severity: warning
+    equal: ['alertname', 'service']

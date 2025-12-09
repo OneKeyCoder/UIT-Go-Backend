@@ -11,6 +11,7 @@ import (
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/logger"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.opentelemetry.io/contrib/instrumentation/go.mongodb.org/mongo-driver/mongo/otelmongo"
 )
 
 type MongoConfig struct {
@@ -55,8 +56,13 @@ func ConnectMongo() (*mongo.Client, error) {
 	if mongoURL := getMongoConnectionString(); mongoURL != "" {
 		logger.Info("Using Mongo connection string from environment", "url", mongoURL)
 
-		// Set client options
-		clientOptions := options.Client().ApplyURI(mongoURL)
+		// Set client options with OpenTelemetry instrumentation
+		// CommandAttributeDisabled: false ensures db.statement is captured
+		clientOptions := options.Client().
+			ApplyURI(mongoURL).
+			SetMonitor(otelmongo.NewMonitor(
+				otelmongo.WithCommandAttributeDisabled(false),
+			))
 
 		// Create context with timeout
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -95,8 +101,12 @@ func ConnectMongo() (*mongo.Client, error) {
 			config.Host, config.Port, config.Database)
 	}
 
-	// Set client options
-	clientOptions := options.Client().ApplyURI(uri)
+	// Set client options with OpenTelemetry instrumentation
+	clientOptions := options.Client().
+		ApplyURI(uri).
+		SetMonitor(otelmongo.NewMonitor(
+			otelmongo.WithCommandAttributeDisabled(false),
+		))
 
 	// Create context with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

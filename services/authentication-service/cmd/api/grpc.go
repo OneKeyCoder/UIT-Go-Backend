@@ -8,11 +8,11 @@ import (
 
 	"authentication-service/data"
 
-	"github.com/OneKeyCoder/UIT-Go-Backend/common/grpcutil"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/jwt"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/logger"
 	pb "github.com/OneKeyCoder/UIT-Go-Backend/proto/auth"
 	userpb "github.com/OneKeyCoder/UIT-Go-Backend/proto/user"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -26,12 +26,8 @@ type AuthServer struct {
 
 // Authenticate handles user authentication
 func (s *AuthServer) Register(ctx context.Context, req *pb.RegisterRequest) (*pb.RegisterResponse, error) {
-	logger.Info("gRPC register request",
-		"email", req.Email,
-	)
-
 	// Check if user already exists
-	existingUser, _ := s.Config.Models.User.GetByEmail(req.Email)
+	existingUser, _ := s.Config.Models.User.GetByEmail(ctx, req.Email)
 	if existingUser != nil {
 		return nil, status.Error(codes.AlreadyExists, "User with this email already exists")
 	}
@@ -46,18 +42,18 @@ func (s *AuthServer) Register(ctx context.Context, req *pb.RegisterRequest) (*pb
 		Role:      "user",
 	}
 
-	userID, err := s.Config.Models.User.Insert(newUser)
+	userID, err := s.Config.Models.User.Insert(ctx, newUser)
 	if err != nil {
-		logger.Error("Failed to create user", "error", err)
+		logger.WithContext(ctx).ErrorContext(ctx, "Failed to create user", "error", err)
 		return nil, status.Error(codes.Internal, "Failed to create user")
 	}
 
 	// Create user in user-service via gRPC
 	if s.Config.UserClient != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		userCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		defer cancel()
 
-		_, err = s.Config.UserClient.CreateUser(ctx, &userpb.CreateUserRequest{
+		_, err = s.Config.UserClient.CreateUser(userCtx, &userpb.CreateUserRequest{
 			Email:     req.Email,
 			FirstName: req.FirstName,
 			LastName:  req.LastName,
@@ -72,13 +68,13 @@ func (s *AuthServer) Register(ctx context.Context, req *pb.RegisterRequest) (*pb
 	}
 
 	// Get the created user
-	user, err := s.Config.Models.User.GetOne(userID)
+	user, err := s.Config.Models.User.GetOne(ctx, userID)
 	if err != nil {
-		logger.Error("Failed to get created user", "error", err)
+		logger.WithContext(ctx).ErrorContext(ctx, "Failed to get created user", "error", err)
 		return nil, status.Error(codes.Internal, "User created but failed to retrieve")
 	}
 
-	logger.Info("User registered successfully (gRPC)",
+	logger.WithContext(ctx).InfoContext(ctx, "User registered successfully (gRPC)",
 		"email", user.Email,
 		"user_id", user.ID,
 	)
@@ -98,27 +94,23 @@ func (s *AuthServer) Register(ctx context.Context, req *pb.RegisterRequest) (*pb
 
 // Authenticate handles user authentication
 func (s *AuthServer) Authenticate(ctx context.Context, req *pb.AuthRequest) (*pb.AuthResponse, error) {
-	logger.Info("gRPC authentication request",
-		"email", req.Email,
-	)
-
 	// Validate user credentials
-	user, err := s.Config.Models.User.GetByEmail(req.Email)
+	user, err := s.Config.Models.User.GetByEmail(ctx, req.Email)
 	if err != nil {
-		logger.Error("User not found", "email", req.Email, "error", err)
+		logger.WithContext(ctx).ErrorContext(ctx, "User not found", "email", req.Email, "error", err)
 		return nil, status.Error(codes.Unauthenticated, "Invalid credentials")
 	}
 
 	// Check password
 	valid, err := user.PasswordMatches(req.Password)
 	if err != nil || !valid {
-		logger.Error("Invalid password", "email", req.Email)
+		logger.WithContext(ctx).ErrorContext(ctx, "Invalid password", "email", req.Email)
 		return nil, status.Error(codes.Unauthenticated, "Invalid credentials")
 	}
 
 	// Check if user is active
 	if user.Active == 0 {
-		logger.Error("Inactive user attempted login", "email", req.Email)
+		logger.WithContext(ctx).ErrorContext(ctx, "Inactive user attempted login", "email", req.Email)
 		return nil, status.Error(codes.PermissionDenied, "User account is inactive")
 	}
 
@@ -132,7 +124,7 @@ func (s *AuthServer) Authenticate(ctx context.Context, req *pb.AuthRequest) (*pb
 		s.Config.RefreshExpiry,
 	)
 	if err != nil {
-		logger.Error("Failed to generate tokens", "error", err)
+		logger.WithContext(ctx).ErrorContext(ctx, "Failed to generate tokens", "error", err)
 		return nil, status.Error(codes.Internal, "Failed to generate tokens")
 	}
 
@@ -183,8 +175,6 @@ func (s *AuthServer) ValidateToken(ctx context.Context, req *pb.ValidateTokenReq
 
 // RefreshToken refreshes an access token using a refresh token
 func (s *AuthServer) RefreshToken(ctx context.Context, req *pb.RefreshTokenRequest) (*pb.AuthResponse, error) {
-	logger.Info("gRPC refresh token request")
-
 	// Validate refresh token
 	claims, err := jwt.ValidateToken(req.RefreshToken, s.Config.JWTSecret)
 	if err != nil {
@@ -223,7 +213,7 @@ func (app *Config) StartGRPCServer() error {
 	}
 
 	grpcServer := grpc.NewServer(
-		grpc.UnaryInterceptor(grpcutil.UnaryServerInterceptor()),
+		grpc.StatsHandler(otelgrpc.NewServerHandler()),
 	)
 
 	authServer := &AuthServer{

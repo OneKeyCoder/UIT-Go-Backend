@@ -9,12 +9,30 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 func (app *Config) routes() http.Handler {
 	mux := chi.NewRouter()
 
-	// Add common middleware
+	// Request ID must be first
+	mux.Use(commonMiddleware.RequestID)
+	
+	// OpenTelemetry HTTP instrumentation BEFORE Logger (creates span context)
+	mux.Use(func(next http.Handler) http.Handler {
+		return otelhttp.NewHandler(
+			next,
+			"api-gateway.http",
+			otelhttp.WithFilter(func(req *http.Request) bool {
+				return !commonMiddleware.ShouldSkipTrace(req.URL.Path)
+			}),
+			otelhttp.WithSpanNameFormatter(func(operation string, r *http.Request) string {
+				return r.Method + " " + r.URL.Path
+			}),
+		)
+	})
+	
+	// Logger AFTER otelhttp (extracts span context)
 	mux.Use(commonMiddleware.Logger)
 	mux.Use(commonMiddleware.Recovery)
 	mux.Use(commonMiddleware.PrometheusMetrics("api-gateway"))
@@ -23,17 +41,15 @@ func (app *Config) routes() http.Handler {
 	mux.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"https://*", "http://*"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
-		ExposedHeaders:   []string{"Link"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token", "X-Request-ID"},
+		ExposedHeaders:   []string{"Link", "X-Request-ID"},
 		AllowCredentials: true,
 		MaxAge:           300,
 	}))
 
-	// Rate limiting: 100 requests per minute per IP
-	// Applied to all routes after other middleware
-	lmt := tollbooth.NewLimiter(100.0/60.0, nil)
-	// Allow short bursts so probes or short spikes don't immediately get 429
-	lmt.SetBurst(100)
+	lmt := tollbooth.NewLimiter(1000.0/60.0, nil)
+	// Allow bursts for concurrent load testing
+	lmt.SetBurst(1000)
 	lmt.SetIPLookups([]string{"X-Forwarded-For", "X-Real-IP", "RemoteAddr"})
 	mux.Use(func(next http.Handler) http.Handler {
 		return tollbooth.LimitHandler(lmt, next)
