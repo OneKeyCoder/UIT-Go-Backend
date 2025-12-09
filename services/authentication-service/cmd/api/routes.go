@@ -16,6 +16,22 @@ func (app *Config) routes() http.Handler {
 
 	// Request ID must be first
 	mux.Use(commonMiddleware.RequestID)
+	
+	// OpenTelemetry HTTP instrumentation BEFORE Logger
+	mux.Use(func(next http.Handler) http.Handler {
+		return otelhttp.NewHandler(
+			next,
+			"authentication-service.http",
+			otelhttp.WithFilter(func(req *http.Request) bool {
+				return !commonMiddleware.ShouldSkipTrace(req.URL.Path)
+			}),
+			otelhttp.WithSpanNameFormatter(func(operation string, r *http.Request) string {
+				return r.Method + " " + r.URL.Path
+			}),
+		)
+	})
+	
+	// Logger AFTER otelhttp
 	mux.Use(commonMiddleware.Logger)
 	mux.Use(commonMiddleware.Recovery)
 	mux.Use(commonMiddleware.PrometheusMetrics("authentication-service"))
@@ -31,20 +47,6 @@ func (app *Config) routes() http.Handler {
 	}))
 
 	mux.Use(middleware.Heartbeat("/ping"))
-
-	// Add OpenTelemetry HTTP instrumentation with operation-specific names
-	mux.Use(func(next http.Handler) http.Handler {
-		return otelhttp.NewHandler(
-			next,
-			"authentication-service.http",
-			otelhttp.WithFilter(func(req *http.Request) bool {
-				return !commonMiddleware.ShouldSkipTrace(req.URL.Path)
-			}),
-			otelhttp.WithSpanNameFormatter(func(operation string, r *http.Request) string {
-				return r.Method + " " + r.URL.Path
-			}),
-		)
-	})
 
 	// Health check endpoints for Kubernetes
 	mux.Get("/health/live", app.Liveness)

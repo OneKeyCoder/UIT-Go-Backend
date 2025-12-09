@@ -53,7 +53,7 @@ func (app *Config) Authenticate(w http.ResponseWriter, r *http.Request) {
 	reqLogger := commonMiddleware.GetRequestLogger(r.Context())
 
 	// Validate the user against the database
-	user, err := app.Models.User.GetByEmail(requestPayload.Email)
+	user, err := app.Models.User.GetByEmail(r.Context(), requestPayload.Email)
 	if err != nil {
 		reqLogger.Warn("Failed authentication attempt",
 			"email", requestPayload.Email,
@@ -207,7 +207,7 @@ func (app *Config) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check if user already exists
-	existingUser, _ := app.Models.User.GetByEmail(requestPayload.Email)
+	existingUser, _ := app.Models.User.GetByEmail(r.Context(), requestPayload.Email)
 	if existingUser != nil {
 		response.BadRequest(w, "User with this email already exists")
 		return
@@ -222,7 +222,7 @@ func (app *Config) Register(w http.ResponseWriter, r *http.Request) {
 		Active:    1,
 	}
 
-	userID, err := app.Models.User.Insert(newUser)
+	userID, err := app.Models.User.Insert(r.Context(), newUser)
 	if err != nil {
 		logger.Error("Failed to create user",
 			"email", requestPayload.Email,
@@ -269,7 +269,7 @@ func (app *Config) Register(w http.ResponseWriter, r *http.Request) {
 	})
 
 	// Get the newly created user (without password)
-	createdUser, err := app.Models.User.GetOne(userID)
+	createdUser, err := app.Models.User.GetOne(r.Context(), userID)
 	if err != nil {
 		// User was created but we couldn't fetch it - still success
 		response.Success(w, "Registration successful", map[string]interface{}{
@@ -292,7 +292,7 @@ func (app *Config) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get user by email
-	user, err := app.Models.User.GetByEmail(requestPayload.Email)
+	user, err := app.Models.User.GetByEmail(r.Context(), requestPayload.Email)
 	if err != nil {
 		logger.Warn("Password change attempt for non-existent user",
 			"email", requestPayload.Email,

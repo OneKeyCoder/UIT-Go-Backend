@@ -16,6 +16,20 @@ func (app *Config) routes() http.Handler {
 	
 	// Request ID must be first to inject into all logs
 	mux.Use(commonMiddleware.RequestID)
+	
+	// OpenTelemetry HTTP instrumentation BEFORE Logger
+	mux.Use(func(next http.Handler) http.Handler {
+		return otelhttp.NewHandler(next, "trip-service.http",
+			otelhttp.WithFilter(func(req *http.Request) bool {
+				return !commonMiddleware.ShouldSkipTrace(req.URL.Path)
+			}),
+			otelhttp.WithSpanNameFormatter(func(operation string, r *http.Request) string {
+				return r.Method + " " + r.URL.Path
+			}),
+		)
+	})
+	
+	// Logger AFTER otelhttp
 	mux.Use(commonMiddleware.Logger)
 	mux.Use(commonMiddleware.Recovery)
 	mux.Use(commonMiddleware.PrometheusMetrics("trip-service"))
@@ -29,16 +43,6 @@ func (app *Config) routes() http.Handler {
 		MaxAge:           300,
 	}))
 	mux.Use(middleware.Heartbeat("/ping"))
-
-	// Add OpenTelemetry HTTP instrumentation with operation-specific span names
-	mux.Use(func(next http.Handler) http.Handler {
-		return otelhttp.NewHandler(next, "trip-service.http",
-			otelhttp.WithSpanNameFormatter(func(operation string, r *http.Request) string {
-				// Create span name from HTTP method + path
-				return r.Method + " " + r.URL.Path
-			}),
-		)
-	})
 
 	mux.Get("/health/live", app.Liveness)
 	mux.Get("/health/ready", app.Readiness)

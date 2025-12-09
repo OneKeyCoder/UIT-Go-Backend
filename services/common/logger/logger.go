@@ -101,22 +101,82 @@ func InitDefault(service string) {
 	}
 }
 
-// WithContext returns logger with trace context if available
-func WithContext(ctx context.Context) *slog.Logger {
+// traceContextLogger wraps slog.Logger to inject trace_id into message body for Grafana correlation
+type traceContextLogger struct {
+	logger  *slog.Logger
+	traceID string
+}
+
+func (l *traceContextLogger) With(args ...any) *slog.Logger {
+	return l.logger.With(args...)
+}
+
+func (l *traceContextLogger) InfoContext(ctx context.Context, msg string, args ...any) {
+	// trace_id is already in structured metadata via logger.With()
+	// No need to inject into message body
+	l.logger.InfoContext(ctx, msg, args...)
+}
+
+func (l *traceContextLogger) ErrorContext(ctx context.Context, msg string, args ...any) {
+	l.logger.ErrorContext(ctx, msg, args...)
+}
+
+func (l *traceContextLogger) WarnContext(ctx context.Context, msg string, args ...any) {
+	l.logger.WarnContext(ctx, msg, args...)
+}
+
+func (l *traceContextLogger) DebugContext(ctx context.Context, msg string, args ...any) {
+	l.logger.DebugContext(ctx, msg, args...)
+}
+
+func (l *traceContextLogger) Log(ctx context.Context, level slog.Level, msg string, args ...any) {
+	l.logger.Log(ctx, level, msg, args...)
+}
+
+// Non-context versions for backward compatibility
+func (l *traceContextLogger) Info(msg string, args ...any) {
+	l.logger.Info(msg, args...)
+}
+
+func (l *traceContextLogger) Error(msg string, args ...any) {
+	l.logger.Error(msg, args...)
+}
+
+func (l *traceContextLogger) Warn(msg string, args ...any) {
+	l.logger.Warn(msg, args...)
+}
+
+func (l *traceContextLogger) Debug(msg string, args ...any) {
+	l.logger.Debug(msg, args...)
+}
+
+// WithContext returns logger with trace context that auto-injects trace_id into messages
+func WithContext(ctx context.Context) *traceContextLogger {
 	if Log == nil {
-		return slog.Default()
+		return &traceContextLogger{
+			logger:  slog.Default(),
+			traceID: "",
+		}
 	}
 
 	span := trace.SpanFromContext(ctx)
 	if !span.IsRecording() {
-		return Log
+		return &traceContextLogger{
+			logger:  Log,
+			traceID: "",
+		}
 	}
 
 	spanCtx := span.SpanContext()
-	return Log.With(
-		"trace_id", spanCtx.TraceID().String(),
-		"span_id", spanCtx.SpanID().String(),
-	)
+	traceID := spanCtx.TraceID().String()
+
+	return &traceContextLogger{
+		logger: Log.With(
+			"trace_id", traceID,
+			"span_id", spanCtx.SpanID().String(),
+		),
+		traceID: traceID,
+	}
 }
 
 // InfoCtx logs an info message with trace context
@@ -329,6 +389,8 @@ func RequestWarn(msg string, args ...any) {
 	if Log != nil {
 		Log.Warn(msg, append(args, "log_type", "request")...)
 	}
+}
+
 // RequestLogger creates a logger with HTTP request context
 // Includes: method, path, remote_addr, user_agent, request_id
 func RequestLogger(ctx context.Context, method, path, remoteAddr, userAgent, requestID string) *slog.Logger {

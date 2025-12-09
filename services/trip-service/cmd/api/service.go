@@ -12,6 +12,7 @@ import (
 	"trip-service/internal/repository"
 
 	"github.com/Azure/go-amqp"
+	"github.com/XSAM/otelsql"
 	_ "github.com/jackc/pgconn"
 	_ "github.com/jackc/pgx/v5"
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -21,6 +22,7 @@ import (
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/rabbitmq"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -58,7 +60,6 @@ func (trip *TripService) CreateTrip(ctx context.Context, newTrip repository.NewT
 		span.RecordError(err)
 		return models.Trip{}, 0, err
 	}
-	logger.Info(ctx, "Route Summary", "route", routeSummary)
 	_, dbSpan := tracer.Start(ctx, "DB.CreateTrip")
 	tripRecord, err := trip.DB.CreateTrip(newTrip, routeSummary.Distance, routeSummary.Fare)
 	dbSpan.End()
@@ -379,10 +380,29 @@ func (trip *TripService) connectToDB() (*sql.DB, error) {
 }
 
 func openDB(dsn string) (*sql.DB, error) {
-	db, err := sql.Open("pgx", dsn)
+	// Use otelsql for automatic PostgreSQL tracing
+	db, err := otelsql.Open("pgx", dsn,
+		otelsql.WithAttributes(semconv.DBSystemPostgreSQL),
+		otelsql.WithSpanOptions(otelsql.SpanOptions{
+			Ping:                 true,
+			RowsNext:             true,
+			DisableErrSkip:       true,
+			OmitConnResetSession: false,
+			OmitConnPrepare:      false,
+			OmitConnQuery:        false,
+			OmitRows:             false,
+			OmitConnectorConnect: false,
+		}),
+	)
 	if err != nil {
 		return nil, err
 	}
+	
+	// Register DB stats metrics for observability
+	if err := otelsql.RegisterDBStatsMetrics(db, otelsql.WithAttributes(semconv.DBSystemPostgreSQL)); err != nil {
+		logger.Error("Failed to register DB stats metrics", "error", err)
+	}
+	
 	db.SetMaxOpenConns(25)
 	db.SetMaxIdleConns(5)
 	db.SetConnMaxLifetime(5 * time.Minute)

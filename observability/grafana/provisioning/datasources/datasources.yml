@@ -31,7 +31,7 @@ datasources:
       derivedFields:
         # Link trace_id in logs to Tempo traces
         - name: TraceID
-          matcherRegex: '"trace_id":"([a-f0-9]+)"'
+          matcherRegex: '\[trace_id=([0-9a-f]{32})\]'
           url: "$${__value.raw}"
           datasourceUid: tempo
           urlDisplayLabel: View Trace
@@ -51,7 +51,7 @@ datasources:
         filterByTraceID: true
         filterBySpanID: false
         customQuery: true
-        query: '{service="$${__span.tags["service.name"]}"} | json | trace_id="$${__trace.traceId}"'
+        query: '{deployment_environment="development"} | trace_id="$${__trace.traceId}"'
       tracesToMetrics:
         datasourceUid: prometheus
         spanStartTimeShift: "-1h"

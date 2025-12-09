@@ -237,7 +237,7 @@ services:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
       GF_USERS_ALLOW_SIGN_UP: "false"
-      GF_FEATURE_TOGGLES_ENABLE: "traceToLogs,correlations"
+      GF_FEATURE_TOGGLES_ENABLE: "traceToLogs,correlations,traceQLStreaming,lokiStructuredMetadata"
       GF_PATHS_PROVISIONING: /etc/grafana/provisioning
       # Anonymous access for demo
       GF_AUTH_ANONYMOUS_ENABLED: "true"
@@ -277,7 +277,6 @@ services:
     restart: unless-stopped
     ports:
       - "3100:3100"
-      - "9096:9096"   # gRPC for internal push
     volumes:
       - ./observability/loki-config.yml:/etc/loki/local-config.yaml:Z
       - loki-data:/loki

@@ -1,6 +1,6 @@
 module logger-service
 
-go 1.24
+go 1.24.0
 
 require (
 	github.com/Azure/go-amqp v1.5.0
@@ -10,6 +10,7 @@ require (
 	github.com/go-chi/cors v1.2.1
 	github.com/prometheus/client_golang v1.23.2
 	go.mongodb.org/mongo-driver v1.17.3
+	go.opentelemetry.io/contrib/instrumentation/go.mongodb.org/mongo-driver/mongo/otelmongo v0.58.0
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.58.0
 	google.golang.org/grpc v1.75.1
 )

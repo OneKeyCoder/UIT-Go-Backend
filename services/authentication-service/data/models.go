@@ -84,8 +84,8 @@ func (u *User) GetAll() ([]*User, error) {
 }
 
 // GetByEmail returns one user by email
-func (u *User) GetByEmail(email string) (*User, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
+func (u *User) GetByEmail(parentCtx context.Context, email string) (*User, error) {
+	ctx, cancel := context.WithTimeout(parentCtx, dbTimeout)
 	defer cancel()
 
 	query := `select id, email, first_name, last_name, password, user_active, role, created_at, updated_at from users where email = $1`
@@ -113,8 +113,8 @@ func (u *User) GetByEmail(email string) (*User, error) {
 }
 
 // GetOne returns one user by id
-func (u *User) GetOne(id int) (*User, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
+func (u *User) GetOne(parentCtx context.Context, id int) (*User, error) {
+	ctx, cancel := context.WithTimeout(parentCtx, dbTimeout)
 	defer cancel()
 
 	query := `select id, email, first_name, last_name, password, user_active, role, created_at, updated_at from users where id = $1`
@@ -201,8 +201,8 @@ func (u *User) DeleteByID(id int) error {
 }
 
 // Insert inserts a new user into the database, and returns the ID of the newly inserted row
-func (u *User) Insert(user User) (int, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
+func (u *User) Insert(parentCtx context.Context, user User) (int, error) {
+	ctx, cancel := context.WithTimeout(parentCtx, dbTimeout)
 	defer cancel()
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), 12)

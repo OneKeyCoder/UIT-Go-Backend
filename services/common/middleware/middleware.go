@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"runtime/debug"
 	"strings"
@@ -95,8 +96,9 @@ func Logger(next http.Handler) http.Handler {
 		requestID := GetRequestID(r.Context())
 		
 		// Log based on status code level using Request log type with request_id
+		// Include trace_id in message for Grafana derivedFields to match
 		if wrapped.statusCode >= 500 {
-			logger.RequestError("HTTP request",
+			logger.RequestError(fmt.Sprintf("HTTP request [trace_id=%s]", traceID),
 				"method", r.Method,
 				"path", r.RequestURI,
 				"status", wrapped.statusCode,
@@ -108,7 +110,7 @@ func Logger(next http.Handler) http.Handler {
 				"request_id", requestID,
 			)
 		} else if wrapped.statusCode >= 400 {
-			logger.RequestWarn("HTTP request",
+			logger.RequestWarn(fmt.Sprintf("HTTP request [trace_id=%s]", traceID),
 				"method", r.Method,
 				"path", r.RequestURI,
 				"status", wrapped.statusCode,
@@ -120,7 +122,7 @@ func Logger(next http.Handler) http.Handler {
 				"request_id", requestID,
 			)
 		} else {
-			logger.RequestInfo("HTTP request",
+			logger.RequestInfo(fmt.Sprintf("HTTP request [trace_id=%s]", traceID),
 				"method", r.Method,
 				"path", r.RequestURI,
 				"status", wrapped.statusCode,

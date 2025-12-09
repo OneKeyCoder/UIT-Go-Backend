@@ -17,6 +17,22 @@ func (app *Config) routes() http.Handler {
 
 	// Request ID must be first
 	mux.Use(commonMiddleware.RequestID)
+	
+	// OpenTelemetry HTTP instrumentation BEFORE Logger (creates span context)
+	mux.Use(func(next http.Handler) http.Handler {
+		return otelhttp.NewHandler(
+			next,
+			"api-gateway.http",
+			otelhttp.WithFilter(func(req *http.Request) bool {
+				return !commonMiddleware.ShouldSkipTrace(req.URL.Path)
+			}),
+			otelhttp.WithSpanNameFormatter(func(operation string, r *http.Request) string {
+				return r.Method + " " + r.URL.Path
+			}),
+		)
+	})
+	
+	// Logger AFTER otelhttp (extracts span context)
 	mux.Use(commonMiddleware.Logger)
 	mux.Use(commonMiddleware.Recovery)
 	mux.Use(commonMiddleware.PrometheusMetrics("api-gateway"))
@@ -37,20 +53,6 @@ func (app *Config) routes() http.Handler {
 	lmt.SetIPLookups([]string{"X-Forwarded-For", "X-Real-IP", "RemoteAddr"})
 	mux.Use(func(next http.Handler) http.Handler {
 		return tollbooth.LimitHandler(lmt, next)
-	})
-
-	// Add OpenTelemetry HTTP instrumentation with operation-specific names
-	mux.Use(func(next http.Handler) http.Handler {
-		return otelhttp.NewHandler(
-			next,
-			"api-gateway.http",
-			otelhttp.WithFilter(func(req *http.Request) bool {
-				return !commonMiddleware.ShouldSkipTrace(req.URL.Path)
-			}),
-			otelhttp.WithSpanNameFormatter(func(operation string, r *http.Request) string {
-				return r.Method + " " + r.URL.Path
-			}),
-		)
 	})
 
 	// Simple ping endpoint

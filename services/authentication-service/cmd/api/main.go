@@ -17,7 +17,6 @@ import (
 
 	"github.com/Azure/go-amqp"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/env"
-	"github.com/OneKeyCoder/UIT-Go-Backend/common/grpcutil"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/logger"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/rabbitmq"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/telemetry"
@@ -195,6 +194,16 @@ func openDB(dsn string) (*sql.DB, error) {
 	// Use otelsql for automatic PostgreSQL tracing
 	db, err := otelsql.Open("pgx", dsn,
 		otelsql.WithAttributes(semconv.DBSystemPostgreSQL),
+		otelsql.WithSpanOptions(otelsql.SpanOptions{
+			Ping:                 true, // Trace connection.Ping
+			RowsNext:             true, // Trace rows.Next
+			DisableErrSkip:       true, // Record all errors
+			OmitConnResetSession: false, // Include reset session
+			OmitConnPrepare:      false, // Include prepare statements
+			OmitConnQuery:        false, // Include queries
+			OmitRows:             false, // Include row operations
+			OmitConnectorConnect: false, // Include connector.Connect
+		}),
 	)
 	if err != nil {
 		return nil, err
