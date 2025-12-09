@@ -53,10 +53,10 @@ variable "liveness_probe" {
     failure_count_threshold = optional(number, 3)
     initial_delay          = optional(number, 1)
     interval_seconds       = optional(number, 10)
-    path                   = optional(string, "/")
-    port                   = number
+    path                   = optional(string, "/health/live")
+    port                   = optional(number, 80)
     timeout                = optional(number, 1)
-    transport              = string
+    transport              = optional(string, "HTTP")
   })
   default = null
 }
@@ -68,10 +68,10 @@ variable "readiness_probe" {
     success_count_threshold = optional(number, 3)
     initial_delay          = optional(number, 1)
     interval_seconds       = optional(number, 10)
-    path                   = optional(string, "/")
-    port                   = number
+    path                   = optional(string, "/health/ready")
+    port                   = optional(number, 80)
     timeout                = optional(number, 1)
-    transport              = string
+    transport              = optional(string, "HTTP")
   })
   default = null
 }

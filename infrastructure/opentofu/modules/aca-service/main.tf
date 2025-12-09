@@ -30,10 +30,10 @@ resource "azurerm_container_app" "go-services" {
       name = var.name
       cpu = "0.5"
       memory = "1Gi"
-      image = "${var.acr_login_server}/${locals.image_name}:${var.image_tag}"
+      image = "${var.acr_login_server}/${local.image_name}:${var.image_tag}"
       dynamic "liveness_probe" {
         for_each = var.liveness_probe != null ? [var.liveness_probe] : []
-        iterator = "i"
+        iterator = i
         content {
           transport             = i.value.transport
           port                  = i.value.port
@@ -46,7 +46,7 @@ resource "azurerm_container_app" "go-services" {
       }
       dynamic "readiness_probe" {
         for_each = var.liveness_probe != null ? [var.liveness_probe] : []
-        iterator = "i"
+        iterator = i
         content {
           transport             = i.value.transport
           port                  = i.value.port

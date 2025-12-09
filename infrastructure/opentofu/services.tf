@@ -29,6 +29,9 @@ module "api_gateway" {
   acr_login_server = local.acr_login_server
   acr_pull_identity_id = local.acr_pull_identity_id
 
+  liveness_probe = {}
+  readiness_probe = {}
+
   is_external_ingress = true
   target_port_ingress = 80
   envs = local.otel_envs
@@ -43,6 +46,9 @@ module "logger_service" {
   
   acr_login_server = local.acr_login_server
   acr_pull_identity_id = local.acr_pull_identity_id
+
+  liveness_probe = {}
+  readiness_probe = {}
 
   is_external_ingress = false
   target_port_ingress = 50052
@@ -64,9 +70,12 @@ module "authentication_service" {
   acr_login_server = local.acr_login_server
   acr_pull_identity_id = local.acr_pull_identity_id
 
+  liveness_probe = {}
+  readiness_probe = {}
+
   is_external_ingress = false
   target_port_ingress = 50051
-  envs = concat(local.otel_envs, {
+  envs = merge(local.otel_envs, {
     "JWT_EXPIRY": "24h"
     "REFRESH_TOKEN_EXPIRY": "168h"
   })
@@ -88,9 +97,12 @@ module "location_service" {
   acr_login_server = local.acr_login_server
   acr_pull_identity_id = local.acr_pull_identity_id
 
+  liveness_probe = {}
+  readiness_probe = {}
+
   is_external_ingress = false
   target_port_ingress = 50053
-  envs = concat(local.otel_envs, {
+  envs = merge(local.otel_envs, {
     "REDIS_HOST": module.location-redis.hostname
     "REDIS_PORT": module.location-redis.port
     "REDIS_DB": 0
@@ -113,6 +125,9 @@ module "trip_service" {
   acr_login_server = local.acr_login_server
   acr_pull_identity_id = local.acr_pull_identity_id
 
+  liveness_probe = {}
+  readiness_probe = {}
+
   is_external_ingress = false
   target_port_ingress = 50054
   envs = local.otel_envs
@@ -134,6 +149,9 @@ module "user_service" {
   
   acr_login_server = local.acr_login_server
   acr_pull_identity_id = local.acr_pull_identity_id
+
+  liveness_probe = {}
+  readiness_probe = {}
 
   is_external_ingress = false
   target_port_ingress = 50055
