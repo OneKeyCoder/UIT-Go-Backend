@@ -46,3 +46,32 @@ variable "target_port_ingress" {
   type = number
   default = 80
 }
+
+variable "liveness_probe" {
+  description = "Liveness probe configuration"
+  type = object({
+    failure_count_threshold = optional(number, 3)
+    initial_delay          = optional(number, 1)
+    interval_seconds       = optional(number, 10)
+    path                   = optional(string, "/")
+    port                   = number
+    timeout                = optional(number, 1)
+    transport              = string
+  })
+  default = null
+}
+
+variable "readiness_probe" {
+  description = "Liveness probe configuration"
+  type = object({
+    failure_count_threshold = optional(number, 3)
+    success_count_threshold = optional(number, 3)
+    initial_delay          = optional(number, 1)
+    interval_seconds       = optional(number, 10)
+    path                   = optional(string, "/")
+    port                   = number
+    timeout                = optional(number, 1)
+    transport              = string
+  })
+  default = null
+}
