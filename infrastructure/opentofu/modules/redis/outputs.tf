@@ -14,6 +14,6 @@ output "kv_secondary_access_key_id" {
   value = azurerm_key_vault_secret.secondary.resource_versionless_id
 }
 
-output "kv_port_id" {
-  value = azurerm_key_vault_secret.port.resource_versionless_id
+output "port" {
+  value = azurerm_managed_redis.redis.default_database[0].port
 }

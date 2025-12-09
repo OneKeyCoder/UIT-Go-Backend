@@ -57,11 +57,3 @@ resource "azurerm_key_vault_secret" "secondary" {
     ignore_changes = [ value ]
   }
 }
-resource "azurerm_key_vault_secret" "port" {
-  name = "${var.resource_prefix}-redis-port"
-  key_vault_id = var.key_vault_id
-  value = azurerm_managed_redis.redis.default_database[0].port
-  lifecycle {
-    ignore_changes = [ value ]
-  }
-}
