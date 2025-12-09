@@ -10,48 +10,20 @@ import (
 )
 
 type EventMessage struct {
-	EventName string `json:"event_name"` // What action was performed
-	ActorID   string `json:"actor_id"`   // Who performed it
-	Metadata  string `json:"metadata"`   // JSON with context (IP, User-Agent, etc.)
-	Status    string `json:"status"`     // success, failure, error
+	Name string `json:"name"`
+	Data string `json:"data"`
 }
 
-// AuditMetadata contains contextual information for audit logs
-// Implements the 4W principle for comprehensive audit trails:
-// - WHO: ActorID (in EventMessage) + Email
-// - WHEN: Timestamp (added by logger-service via MongoDB)
-// - WHAT: EventName + Action + Status
-// - WHERE: IP + UserAgent (browser/device info)
-type AuditMetadata struct {
-	IP        string                 `json:"ip"`         // WHERE: Client IP (from X-Forwarded-For, X-Real-IP, or RemoteAddr)
-	UserAgent string                 `json:"user_agent"` // WHERE: Client User-Agent (Mobile/Desktop/Browser)
-	Email     string                 `json:"email,omitempty"`
-	Action    string                 `json:"action,omitempty"` // WHAT: Human-readable action description
-	Reason    string                 `json:"reason,omitempty"` // WHY: Failure reason for security monitoring (brute-force detection)
-	Extra     map[string]interface{} `json:"extra,omitempty"`  // Additional structured context data
-}
-
-// PublishAuditEvent publishes a structured audit event to RabbitMQ
-// Uses a reusable session if provided, otherwise creates a new one
-func PublishAuditEvent(conn *amqp.Conn, eventName, actorID, status string, metadata AuditMetadata) error {
-	return PublishAuditEventWithSession(nil, conn, eventName, actorID, status, metadata)
-}
-
-// PublishAuditEventWithSession publishes using a specific session (for connection pooling)
-func PublishAuditEventWithSession(session *amqp.Session, conn *amqp.Conn, eventName, actorID, status string, metadata AuditMetadata) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+func PublishEvent(conn *amqp.Conn, eventName, eventData string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Use provided session or create new one
-	if session == nil {
-		var err error
-		session, err = conn.NewSession(ctx, nil)
-		if err != nil {
-			logger.Error("Failed to open RabbitMQ channel", "error", err)
-			return err
-		}
-		defer session.Close(ctx)
+	session, err := conn.NewSession(ctx, nil)
+	if err != nil {
+		logger.Error("Failed to open RabbitMQ channel", "error", err)
+		return err
 	}
+	defer session.Close(ctx)
 
 	// Create a sender to the logs queue
 	sender, err := session.NewSender(ctx, "/queues/logs", nil)
@@ -61,19 +33,10 @@ func PublishAuditEventWithSession(session *amqp.Session, conn *amqp.Conn, eventN
 	}
 	defer sender.Close(ctx)
 
-	// Marshal metadata to JSON string
-	metadataJSON, err := json.Marshal(metadata)
-	if err != nil {
-		logger.Error("Failed to marshal metadata", "error", err)
-		return err
-	}
-
-	// Create structured event message
+	// Create event message
 	event := EventMessage{
-		EventName: eventName,
-		ActorID:   actorID,
-		Metadata:  string(metadataJSON),
-		Status:    status,
+		Name: eventName,
+		Data: eventData,
 	}
 
 	body, err := json.Marshal(event)
@@ -97,21 +60,11 @@ func PublishAuditEventWithSession(session *amqp.Session, conn *amqp.Conn, eventN
 		return err
 	}
 
-	logger.Info("Published audit event to RabbitMQ",
-		"event_name", eventName,
-		"actor_id", actorID,
-		"status", status)
+	logger.Info("Published event to RabbitMQ",
+		"name", eventName,
+		"data", eventData)
 
 	return nil
-}
-
-// Legacy function for backward compatibility
-func PublishEvent(conn *amqp.Conn, eventName, eventData string) error {
-	// Convert to new format with minimal context
-	metadata := AuditMetadata{
-		Action: eventData,
-	}
-	return PublishAuditEvent(conn, eventName, "system", "success", metadata)
 }
 
 // Helper function to create string pointer

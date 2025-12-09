@@ -37,7 +37,6 @@ type Config struct {
 	JWTExpiry     time.Duration
 	RefreshExpiry time.Duration
 	RabbitConn    *amqp.Conn
-	RabbitSession *amqp.Session // Reusable session for publishing
 	UserClient    userpb.UserServiceClient
 }
 
@@ -90,28 +89,11 @@ func main() {
 
 	// Connect to RabbitMQ
 	rabbitConn, err := rabbitmq.ConnectSimple(env.RabbitMQURL())
-	var rabbitSession *amqp.Session
 	if err != nil {
 		logger.Error("Failed to connect to RabbitMQ, continuing without events", "error", err)
 	} else {
 		logger.Info("Connected to RabbitMQ")
-
-		// Create a reusable session for publishing (reduce overhead)
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		rabbitSession, err = rabbitConn.NewSession(ctx, nil)
-		cancel()
-		if err != nil {
-			logger.Error("Failed to create RabbitMQ session", "error", err)
-		} else {
-			logger.Info("Created RabbitMQ session for publishing")
-		}
-
 		defer func() {
-			if rabbitSession != nil {
-				if err := rabbitSession.Close(context.Background()); err != nil {
-					logger.Error("Error closing RabbitMQ session", "error", err)
-				}
-			}
 			if err := rabbitConn.Close(); err != nil {
 				logger.Error("Error closing RabbitMQ connection", "error", err)
 			}
@@ -141,7 +123,6 @@ func main() {
 		JWTExpiry:     jwtExpiry,
 		RefreshExpiry: refreshExpiry,
 		RabbitConn:    rabbitConn,
-		RabbitSession: rabbitSession,
 		UserClient:    userClient,
 	}
 
