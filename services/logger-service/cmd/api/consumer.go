@@ -63,14 +63,33 @@ func (app *Config) ConsumeFromRabbitMQ(conn *amqp.Conn) error {
 	logger.Info("RabbitMQ consumer ready", "address", "/queues/logs")
 
 	// Process messages in a loop
+	consecutiveErrors := 0
+	maxConsecutiveErrors := 5
 	for {
 		// Receive next message (blocks until message is available or context is cancelled)
 		ctx := context.Background()
 		msg, err := receiver.Receive(ctx, nil)
 		if err != nil {
-			logger.Error("Failed to receive message", "error", err)
+			consecutiveErrors++
+			
+			// Exponential backoff when RabbitMQ is down
+			if consecutiveErrors >= maxConsecutiveErrors {
+				backoffDuration := time.Duration(consecutiveErrors-maxConsecutiveErrors+1) * 5 * time.Second
+				if backoffDuration > 60*time.Second {
+					backoffDuration = 60 * time.Second // Max 60s backoff
+				}
+				logger.Error("RabbitMQ receive failed, backing off", 
+					"error", err, 
+					"consecutive_errors", consecutiveErrors,
+					"backoff_seconds", backoffDuration.Seconds())
+				time.Sleep(backoffDuration)
+			} else {
+				logger.Error("Failed to receive message", "error", err)
+			}
 			continue
 		}
+		// Reset error counter on success
+		consecutiveErrors = 0
 
 		// Process the message
 		var logMsg LogMessage
