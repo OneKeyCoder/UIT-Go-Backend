@@ -54,10 +54,6 @@ module "key_vault" {
   resource_prefix = var.resource_prefix
   resource_group_name = local.rg_name
   location = local.rg_location
-
-  allowed_subnet_ids = [
-    module.networking.aca-subnet-id,
-  ]
   
   jwt_secret  = var.jwt_secret
   here_id     = var.here_id
