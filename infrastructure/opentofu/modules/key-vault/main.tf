@@ -25,13 +25,6 @@ resource "azurerm_key_vault" "keyvault" {
 
   soft_delete_retention_days  = 7
   purge_protection_enabled    = false
-
-  # only allow service endpoints
-  network_acls {
-    bypass = "AzureServices"
-    default_action = "Deny"
-    virtual_network_subnet_ids = var.allowed_subnet_ids
-  }
 }
 
 # Grant Terraform service principal permissions to manage secrets
@@ -39,6 +32,7 @@ resource "azurerm_role_assignment" "terraform_kv_admin" {
   scope                = azurerm_key_vault.keyvault.id
   role_definition_name = "Key Vault Administrator"
   principal_id         = data.azurerm_client_config.current.object_id
+  depends_on = [ azurerm_role_assignment.terraform_kv_officer ]
 }
 resource "azurerm_role_assignment" "terraform_kv_officer" {
   scope                = azurerm_key_vault.keyvault.id
@@ -67,7 +61,6 @@ resource "azurerm_key_vault_secret" "jwt_secret" {
   depends_on = [azurerm_role_assignment.terraform_kv_admin]
 }
 
-# HERE Maps API credentials for trip service
 resource "azurerm_key_vault_secret" "here_id" {
   name         = "${var.resource_prefix}-here-id"
   key_vault_id = azurerm_key_vault.keyvault.id

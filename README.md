@@ -5,6 +5,7 @@ A non-modern, maybe-scalable microservices backend built with Go. Should support
 ## TODO
 
 - [ ] Remove the `replace` directive from go.mod files and switch to go workspaces for local dev.
+- [ ] Add extra ingress ports with azapi provider.
 
 ## Repo structure
 
