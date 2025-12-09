@@ -13,11 +13,6 @@ variable "location" {
   type        = string
 }
 
-variable "allowed_subnet_ids" {
-  description = "List of Subnet IDs that are allowed to access the Key Vault public FDNS"
-  type        = set(string)
-}
-
 variable "jwt_secret" {
   description = "JWT secret for authentication service"
   type        = string
