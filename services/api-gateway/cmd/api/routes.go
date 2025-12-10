@@ -8,7 +8,6 @@ import (
 	"github.com/didip/tollbooth/v7"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
@@ -35,6 +34,7 @@ func (app *Config) routes() http.Handler {
 	// Logger AFTER otelhttp (extracts span context)
 	mux.Use(commonMiddleware.Logger)
 	mux.Use(commonMiddleware.Recovery)
+	// Prometheus metrics middleware still works (for now, can instrument with OTel later)
 	mux.Use(commonMiddleware.PrometheusMetrics("api-gateway"))
 
 	// CORS configuration
@@ -67,8 +67,8 @@ func (app *Config) routes() http.Handler {
 	mux.Get("/health/live", app.Liveness)
 	mux.Get("/health/ready", app.Readiness)
 
-	// Metrics endpoint for Prometheus
-	mux.Handle("/metrics", promhttp.Handler())
+	// Metrics endpoint REMOVED - now using OTLP push to Alloy
+	// mux.Handle("/metrics", promhttp.Handler())
 
 	// Broker routes
 	mux.Post("/", app.Broker)

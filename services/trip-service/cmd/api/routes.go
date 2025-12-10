@@ -7,7 +7,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
@@ -47,7 +46,8 @@ func (app *Config) routes() http.Handler {
 	mux.Get("/health/live", app.Liveness)
 	mux.Get("/health/ready", app.Readiness)
 
-	mux.Handle("/metrics", promhttp.Handler())
+	// Metrics endpoint REMOVED - using OTLP push to Alloy
+	// mux.Handle("/metrics", promhttp.Handler())
 
 	mux.Post("/trip/create", app.CreateTrip)
 	mux.Put("/trip/accept", app.AcceptTrip)

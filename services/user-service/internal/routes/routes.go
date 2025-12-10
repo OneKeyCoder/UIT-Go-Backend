@@ -6,7 +6,6 @@ import (
 
 	commonMiddleware "github.com/OneKeyCoder/UIT-Go-Backend/common/middleware"
 	"github.com/gin-gonic/gin"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 )
 
@@ -31,8 +30,8 @@ func SetupRoutes(router *gin.Engine, userHandlers *handlers.Handlers) {
 		c.JSON(http.StatusOK, gin.H{"status": "ready"})
 	})
 
-	// Metrics endpoint - use promhttp.Handler()
-	router.GET("/metrics", gin.WrapH(promhttp.Handler()))
+	// Metrics endpoint REMOVED - using OTLP push to Alloy
+	// router.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
 	// User endpoints
 	router.GET("/users", func(c *gin.Context) {

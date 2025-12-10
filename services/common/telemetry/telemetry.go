@@ -13,12 +13,16 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp"
+	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
+	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 	"go.opentelemetry.io/otel/log/global"
+	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/propagation"
 	sdklog "go.opentelemetry.io/otel/sdk/log"
+	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
@@ -30,6 +34,8 @@ var (
 	Tracer trace.Tracer
 	// Logger is the global slog logger that exports to OTLP
 	Logger *slog.Logger
+	// Meter is the global meter instance
+	Meter metric.Meter
 )
 
 // InitTracer initializes OpenTelemetry tracing with support for OTLP or stdout export
@@ -305,4 +311,119 @@ func GetTraceID(ctx context.Context) string {
 		return span.SpanContext().TraceID().String()
 	}
 	return ""
+}
+
+// InitMetrics initializes OpenTelemetry metrics with support for OTLP export
+func InitMetrics(serviceName, serviceVersion string) (func(context.Context) error, error) {
+	ctx := context.Background()
+
+	// Get OTLP endpoint from environment
+	endpoint := os.Getenv("OTEL_COLLECTOR_ENDPOINT")
+	if endpoint == "" {
+		endpoint = "alloy:4317"
+	}
+	fmt.Fprintf(os.Stderr, "[TELEMETRY INIT] Initializing metrics for service=%s version=%s endpoint=%s\n", serviceName, serviceVersion, endpoint)
+
+	// Create resource with service information
+	res, err := resource.New(ctx,
+		resource.WithAttributes(
+			semconv.ServiceNameKey.String(serviceName),
+			semconv.ServiceVersionKey.String(serviceVersion),
+		),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create resource: %w", err)
+	}
+
+	var mp *sdkmetric.MeterProvider
+
+	// Check if OTLP exporter is enabled
+	exporterType := os.Getenv("OTEL_EXPORTER")
+	if exporterType == "otlp" {
+		// Check for Grafana Cloud (HTTP) or local Alloy (gRPC)
+		if strings.Contains(endpoint, "https://") || strings.Contains(endpoint, "http://") {
+			// Use HTTP exporter for Grafana Cloud
+			metricExporter, err := createHTTPMetricExporter(ctx, endpoint)
+			if err != nil {
+				return nil, err
+			}
+			mp = sdkmetric.NewMeterProvider(
+				sdkmetric.WithReader(sdkmetric.NewPeriodicReader(metricExporter)),
+				sdkmetric.WithResource(res),
+			)
+		} else {
+			// Use gRPC exporter for local Alloy
+			metricExporter, err := createGRPCMetricExporter(ctx, endpoint)
+			if err != nil {
+				return nil, err
+			}
+			mp = sdkmetric.NewMeterProvider(
+				sdkmetric.WithReader(sdkmetric.NewPeriodicReader(metricExporter)),
+				sdkmetric.WithResource(res),
+			)
+		}
+		fmt.Fprintf(os.Stderr, "[TELEMETRY INIT] Created OTLP metric exporter for endpoint=%s\n", endpoint)
+	} else {
+		// No metrics in stdout mode
+		fmt.Fprintf(os.Stderr, "[TELEMETRY INIT] Metrics disabled (OTEL_EXPORTER != otlp)\n")
+		return func(ctx context.Context) error { return nil }, nil
+	}
+
+	// Set global meter provider
+	otel.SetMeterProvider(mp)
+
+	// Create meter for this service
+	Meter = mp.Meter(serviceName)
+
+	// Return shutdown function
+	shutdown := func(ctx context.Context) error {
+		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
+		if err := mp.Shutdown(ctx); err != nil {
+			return err
+		}
+		return nil
+	}
+
+	fmt.Fprintf(os.Stderr, "[TELEMETRY INIT] Metrics initialized successfully for service=%s\n", serviceName)
+	return shutdown, nil
+}
+
+// createGRPCMetricExporter creates a gRPC OTLP metric exporter for local Alloy
+func createGRPCMetricExporter(ctx context.Context, endpoint string) (sdkmetric.Exporter, error) {
+	opts := []otlpmetricgrpc.Option{
+		otlpmetricgrpc.WithEndpoint(endpoint),
+	}
+
+	// Check if insecure mode (local development)
+	if os.Getenv("OTEL_INSECURE") == "true" || !strings.Contains(endpoint, ":443") {
+		opts = append(opts, otlpmetricgrpc.WithInsecure())
+	}
+
+	return otlpmetricgrpc.New(ctx, opts...)
+}
+
+// createHTTPMetricExporter creates an HTTP OTLP metric exporter for Grafana Cloud
+func createHTTPMetricExporter(ctx context.Context, endpoint string) (sdkmetric.Exporter, error) {
+	// Remove https:// prefix for the endpoint
+	endpoint = strings.TrimPrefix(endpoint, "https://")
+	endpoint = strings.TrimPrefix(endpoint, "http://")
+
+	opts := []otlpmetrichttp.Option{
+		otlpmetrichttp.WithEndpoint(endpoint),
+	}
+
+	// Add headers if provided (for Grafana Cloud auth)
+	headers := os.Getenv("OTEL_EXPORTER_OTLP_HEADERS")
+	if headers != "" {
+		headerMap := parseHeaders(headers)
+		opts = append(opts, otlpmetrichttp.WithHeaders(headerMap))
+	}
+
+	// Check if insecure (http:// instead of https://)
+	if os.Getenv("OTEL_INSECURE") == "true" {
+		opts = append(opts, otlpmetrichttp.WithInsecure())
+	}
+
+	return otlpmetrichttp.New(ctx, opts...)
 }

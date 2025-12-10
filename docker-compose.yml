@@ -170,7 +170,6 @@ services:
       RABBITMQ_DEFAULT_PASS: guest
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
-      - ./observability/rabbitmq-config.conf:/etc/rabbitmq/conf.d/20-uit-go.conf:Z
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "ping"]
       interval: 10s
