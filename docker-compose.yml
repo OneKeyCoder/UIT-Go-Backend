@@ -8,7 +8,8 @@ volumes:
   prometheus-data:
   grafana-data:
   loki-data:
-  jaeger-data:
+  tempo-data:
+  alertmanager-data:
 
 services:
   api-gateway:
@@ -32,7 +33,7 @@ services:
         condition: service_started
       user-service:
         condition: service_started
-      jaeger:
+      tempo:
         condition: service_started
     environment:
       OTEL_EXPORTER: "otlp"
@@ -80,7 +81,7 @@ services:
         condition: service_started
       user-service:
         condition: service_started
-      jaeger:
+      tempo:
         condition: service_started
     environment:
       DSN: "host=postgres port=5432 user=postgres password=password dbname=users sslmode=disable timezone=UTC connect_timeout=5"
@@ -169,32 +170,30 @@ services:
       RABBITMQ_DEFAULT_PASS: guest
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
-      - ./observability/rabbitmq-config.conf:/etc/rabbitmq/conf.d/20-uit-go.conf:Z
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  jaeger:
-    image: "jaegertracing/jaeger:2.2.0"
-    user: root # Required for Badger storage write permissions
-    ports:
-      - "16686:16686" # Jaeger UI
-    expose:
-      - "4317" # OTLP gRPC receiver
-      - "4318" # OTLP HTTP receiver
-      - "8888"
+  tempo:
+    image: "grafana/tempo:latest"
     restart: unless-stopped
+    ports:
+      - "3200:3200" # Tempo query/metrics
+    expose:
+      - "4317" # OTLP gRPC
+      - "4318" # OTLP HTTP
+    command:
+      - "-config.file=/etc/tempo/config.yml"
     volumes:
-      - ./observability/config-badger.yml:/etc/jaeger/config.yaml:Z
-      - jaeger-data:/badger
-    command: ["--config", "/etc/jaeger/config.yaml"]
+      - ./observability/tempo-config.yml:/etc/tempo/config.yml:Z
+      - tempo-data:/var/tempo
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://localhost:16686/ || exit 1"]
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3200/ready"]
       interval: 30s
       timeout: 10s
-      retries: 5
+      retries: 3
       start_period: 30s
 
   prometheus:
@@ -202,6 +201,9 @@ services:
     ports:
       - "9090:9090"
     restart: unless-stopped
+    depends_on:
+      alertmanager:
+        condition: service_healthy
     volumes:
       - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:Z
       - ./observability/prometheus-alerts.yml:/etc/prometheus/alerts/prometheus-alerts.yml:Z
@@ -228,13 +230,13 @@ services:
         condition: service_healthy
       loki:
         condition: service_healthy
-      jaeger:
-        condition: service_healthy
+      tempo:
+        condition: service_started
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
       GF_USERS_ALLOW_SIGN_UP: "false"
-      GF_FEATURE_TOGGLES_ENABLE: "traceToLogs,correlations"
+      GF_FEATURE_TOGGLES_ENABLE: "traceToLogs,correlations,traceQLStreaming,lokiStructuredMetadata"
       GF_PATHS_PROVISIONING: /etc/grafana/provisioning
       # Anonymous access for demo
       GF_AUTH_ANONYMOUS_ENABLED: "true"
@@ -249,9 +251,28 @@ services:
       timeout: 10s
       retries: 3
 
+  alertmanager:
+    image: prom/alertmanager:v0.28.1
+    ports:
+      - "9093:9093"
+    restart: unless-stopped
+    volumes:
+      - alertmanager-data:/alertmanager
+      - ./observability/alertmanager.yml:/etc/alertmanager/alertmanager.yml:Z
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+      - "--storage.path=/alertmanager"
+      - "--web.external-url=http://localhost:9093"
+      - "--cluster.advertise-address=0.0.0.0:9093"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9093/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
   loki:
     image: grafana/loki:3.2.1
-    user: root
     restart: unless-stopped
     ports:
       - "3100:3100"
@@ -264,6 +285,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 150s
 
   alloy:
     image: grafana/alloy:latest
@@ -279,8 +301,8 @@ services:
     depends_on:
       loki:
         condition: service_healthy
-      jaeger:
-        condition: service_healthy
+      tempo:
+        condition: service_started
 
   trip-service:
     build:
@@ -320,8 +342,6 @@ services:
       mongo:
         condition: service_started
       alloy:
-        condition: service_started
-      jaeger:
         condition: service_started
     environment:
       MONGO_CONNECTION_STRING: "mongodb://admin:password@mongo:27017"

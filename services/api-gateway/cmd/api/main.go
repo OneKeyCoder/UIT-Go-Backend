@@ -35,6 +35,20 @@ func main() {
 		}()
 	}
 
+	// Initialize metrics (OTLP push to Alloy)
+	shutdownMetrics, err := telemetry.InitMetrics("api-gateway", "1.0.0")
+	if err != nil {
+		fmt.Printf("Failed to initialize metrics: %v\n", err)
+	} else {
+		defer func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := shutdownMetrics(ctx); err != nil {
+				logger.Error("Failed to shutdown metrics", "error", err)
+			}
+		}()
+	}
+
 	// Initialize logger AFTER telemetry (to pick up OTLP provider)
 	logger.InitDefault("api-gateway")
 	logger.Info("Starting API Gateway")

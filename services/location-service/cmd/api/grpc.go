@@ -8,10 +8,11 @@ import (
 
 	location_service "location-service/internal"
 
-	"github.com/OneKeyCoder/UIT-Go-Backend/common/grpcutil"
+
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/logger"
 	pb "github.com/OneKeyCoder/UIT-Go-Backend/proto/location"
 
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 )
 
@@ -37,7 +38,7 @@ func (s *LocationServer) SetLocation(ctx context.Context, req *pb.SetLocationReq
 
 	err := s.service.SetCurrentLocation(ctx, location)
 	if err != nil {
-		logger.Error("Failed to set location", "error", err)
+		logger.WithContext(ctx).ErrorContext(ctx, "Failed to set location", "error", err)
 		return &pb.SetLocationResponse{
 			Success: false,
 			Message: err.Error(),
@@ -64,7 +65,7 @@ func (s *LocationServer) GetLocation(ctx context.Context, req *pb.GetLocationReq
 
 	location, err := s.service.GetCurrentLocation(ctx, int(req.UserId))
 	if err != nil {
-		logger.Error("Failed to get location", "error", err)
+		logger.WithContext(ctx).ErrorContext(ctx, "Failed to get location", "error", err)
 		return &pb.GetLocationResponse{
 			Success: false,
 			Message: err.Error(),
@@ -112,7 +113,7 @@ func (s *LocationServer) FindNearestUsers(ctx context.Context, req *pb.FindNeare
 
 	locations, err := s.service.FindTopNearestUsers(ctx, int(req.UserId), topN, radius)
 	if err != nil {
-		logger.Error("Failed to find nearest users", "error", err)
+		logger.WithContext(ctx).ErrorContext(ctx, "Failed to find nearest users", "error", err)
 		return &pb.FindNearestUsersResponse{
 			Success: false,
 			Message: err.Error(),
@@ -141,11 +142,9 @@ func (s *LocationServer) FindNearestUsers(ctx context.Context, req *pb.FindNeare
 }
 
 func (s *LocationServer) GetAllLocations(ctx context.Context, req *pb.GetAllLocationsRequest) (*pb.GetAllLocationsResponse, error) {
-	logger.Info("gRPC GetAllLocations called")
-
 	locations, err := s.service.GetAllLocations(ctx)
 	if err != nil {
-		logger.Error("Failed to get all locations", "error", err)
+		logger.WithContext(ctx).ErrorContext(ctx, "Failed to get all locations", "error", err)
 		return &pb.GetAllLocationsResponse{
 			Success: false,
 			Message: err.Error(),
@@ -179,7 +178,7 @@ func startGRPCServer(locationService *location_service.LocationService) {
 	}
 
 	s := grpc.NewServer(
-		grpc.UnaryInterceptor(grpcutil.UnaryServerInterceptor()),
+		grpc.StatsHandler(otelgrpc.NewServerHandler()),
 	)
 
 	pb.RegisterLocationServiceServer(s, &LocationServer{

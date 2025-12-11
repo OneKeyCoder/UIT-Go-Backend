@@ -18,15 +18,21 @@ var (
 	serviceName string
 )
 
-// filteringOTLPHandler wraps OTLP handler to only send WARN and above
-// This prevents INFO logs from bloating Loki storage
+// filteringOTLPHandler wraps OTLP handler with configurable level filtering
+// Log Levels (from lowest to highest severity):
+// - DEBUG: Detailed information for debugging (development/staging only)
+// - INFO: Confirmation that things are working as expected
+// - WARN: Something unexpected but system still functioning
+// - ERROR: Error occurred, feature broken but system still running
+// - FATAL: Critical error, application crash or cannot serve
 type filteringOTLPHandler struct {
-	handler slog.Handler
+	handler  slog.Handler
+	minLevel slog.Level
 }
 
 func (f *filteringOTLPHandler) Enabled(ctx context.Context, level slog.Level) bool {
-	// Only enable WARN and above for OTLP export
-	return level >= slog.LevelWarn
+	// Filter based on configured minimum level
+	return level >= f.minLevel
 }
 
 func (f *filteringOTLPHandler) Handle(ctx context.Context, r slog.Record) error {
@@ -34,11 +40,17 @@ func (f *filteringOTLPHandler) Handle(ctx context.Context, r slog.Record) error 
 }
 
 func (f *filteringOTLPHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
-	return &filteringOTLPHandler{handler: f.handler.WithAttrs(attrs)}
+	return &filteringOTLPHandler{
+		handler:  f.handler.WithAttrs(attrs),
+		minLevel: f.minLevel,
+	}
 }
 
 func (f *filteringOTLPHandler) WithGroup(name string) slog.Handler {
-	return &filteringOTLPHandler{handler: f.handler.WithGroup(name)}
+	return &filteringOTLPHandler{
+		handler:  f.handler.WithGroup(name),
+		minLevel: f.minLevel,
+	}
 }
 
 // Init initializes the global logger with OTLP backend
@@ -64,11 +76,15 @@ func Init(service string, isDevelopment bool) error {
 		handlers = append(handlers, slog.NewJSONHandler(os.Stdout, stdoutOpts))
 	}
 
-	// Add OTLP handler if LoggerProvider is available (WARN+ only to reduce Loki storage)
+	// Add OTLP handler if LoggerProvider is available (ALL log levels to Loki)
 	if lp != nil {
 		otelHandler := otelslog.NewHandler(service, otelslog.WithLoggerProvider(lp))
-		// Wrap with filtering handler to only send WARN and above to OTLP
-		handlers = append(handlers, &filteringOTLPHandler{handler: otelHandler})
+		handlers = append(handlers, otelHandler)
+		// DEBUG: Log that OTLP handler was added
+		fmt.Fprintf(os.Stderr, "[LOGGER INIT] OTLP handler ADDED for service=%s, handlers_count=%d\n", service, len(handlers))
+	} else {
+		// DEBUG: Log that OTLP handler was NOT added
+		fmt.Fprintf(os.Stderr, "[LOGGER INIT] OTLP handler NOT added - LoggerProvider is nil for service=%s\n", service)
 	}
 
 	// Create multi-handler logger
@@ -85,23 +101,82 @@ func InitDefault(service string) {
 	}
 }
 
+// traceContextLogger wraps slog.Logger to inject trace_id into message body for Grafana correlation
+type traceContextLogger struct {
+	logger  *slog.Logger
+	traceID string
+}
 
-// WithContext returns logger with trace context if available
-func WithContext(ctx context.Context) *slog.Logger {
+func (l *traceContextLogger) With(args ...any) *slog.Logger {
+	return l.logger.With(args...)
+}
+
+func (l *traceContextLogger) InfoContext(ctx context.Context, msg string, args ...any) {
+	// trace_id is already in structured metadata via logger.With()
+	// No need to inject into message body
+	l.logger.InfoContext(ctx, msg, args...)
+}
+
+func (l *traceContextLogger) ErrorContext(ctx context.Context, msg string, args ...any) {
+	l.logger.ErrorContext(ctx, msg, args...)
+}
+
+func (l *traceContextLogger) WarnContext(ctx context.Context, msg string, args ...any) {
+	l.logger.WarnContext(ctx, msg, args...)
+}
+
+func (l *traceContextLogger) DebugContext(ctx context.Context, msg string, args ...any) {
+	l.logger.DebugContext(ctx, msg, args...)
+}
+
+func (l *traceContextLogger) Log(ctx context.Context, level slog.Level, msg string, args ...any) {
+	l.logger.Log(ctx, level, msg, args...)
+}
+
+// Non-context versions for backward compatibility
+func (l *traceContextLogger) Info(msg string, args ...any) {
+	l.logger.Info(msg, args...)
+}
+
+func (l *traceContextLogger) Error(msg string, args ...any) {
+	l.logger.Error(msg, args...)
+}
+
+func (l *traceContextLogger) Warn(msg string, args ...any) {
+	l.logger.Warn(msg, args...)
+}
+
+func (l *traceContextLogger) Debug(msg string, args ...any) {
+	l.logger.Debug(msg, args...)
+}
+
+// WithContext returns logger with trace context that auto-injects trace_id into messages
+func WithContext(ctx context.Context) *traceContextLogger {
 	if Log == nil {
-		return slog.Default()
+		return &traceContextLogger{
+			logger:  slog.Default(),
+			traceID: "",
+		}
 	}
-	
+
 	span := trace.SpanFromContext(ctx)
 	if !span.IsRecording() {
-		return Log
+		return &traceContextLogger{
+			logger:  Log,
+			traceID: "",
+		}
 	}
-	
+
 	spanCtx := span.SpanContext()
-	return Log.With(
-		"trace_id", spanCtx.TraceID().String(),
-		"span_id", spanCtx.SpanID().String(),
-	)
+	traceID := spanCtx.TraceID().String()
+
+	return &traceContextLogger{
+		logger: Log.With(
+			"trace_id", traceID,
+			"span_id", spanCtx.SpanID().String(),
+		),
+		traceID: traceID,
+	}
 }
 
 // InfoCtx logs an info message with trace context
@@ -109,9 +184,41 @@ func InfoCtx(ctx context.Context, msg string, args ...any) {
 	WithContext(ctx).InfoContext(ctx, msg, args...)
 }
 
+// Info logs an info message (alias for backward compatibility - now auto-extracts trace if first arg is context)
+func Info(msgOrCtx any, args ...any) {
+	if ctx, ok := msgOrCtx.(context.Context); ok && len(args) > 0 {
+		// New pattern: logger.Info(ctx, "message", "key", "value")
+		if msg, ok := args[0].(string); ok {
+			InfoCtx(ctx, msg, args[1:]...)
+			return
+		}
+	}
+	// Old pattern: logger.Info("message", "key", "value") - no context
+	if msg, ok := msgOrCtx.(string); ok {
+		if Log != nil {
+			Log.Info(msg, args...)
+		}
+	}
+}
+
 // ErrorCtx logs an error message with trace context
 func ErrorCtx(ctx context.Context, msg string, args ...any) {
 	WithContext(ctx).ErrorContext(ctx, msg, args...)
+}
+
+// Error logs an error message (alias with auto-context extraction)
+func Error(msgOrCtx any, args ...any) {
+	if ctx, ok := msgOrCtx.(context.Context); ok && len(args) > 0 {
+		if msg, ok := args[0].(string); ok {
+			ErrorCtx(ctx, msg, args[1:]...)
+			return
+		}
+	}
+	if msg, ok := msgOrCtx.(string); ok {
+		if Log != nil {
+			Log.Error(msg, args...)
+		}
+	}
 }
 
 // WarnCtx logs a warning message with trace context
@@ -119,30 +226,24 @@ func WarnCtx(ctx context.Context, msg string, args ...any) {
 	WithContext(ctx).WarnContext(ctx, msg, args...)
 }
 
+// Warn logs a warning message (alias with auto-context extraction)
+func Warn(msgOrCtx any, args ...any) {
+	if ctx, ok := msgOrCtx.(context.Context); ok && len(args) > 0 {
+		if msg, ok := args[0].(string); ok {
+			WarnCtx(ctx, msg, args[1:]...)
+			return
+		}
+	}
+	if msg, ok := msgOrCtx.(string); ok {
+		if Log != nil {
+			Log.Warn(msg, args...)
+		}
+	}
+}
+
 // DebugCtx logs a debug message with trace context
 func DebugCtx(ctx context.Context, msg string, args ...any) {
 	WithContext(ctx).DebugContext(ctx, msg, args...)
-}
-
-// Info logs an info message
-func Info(msg string, args ...any) {
-	if Log != nil {
-		Log.Info(msg, args...)
-	}
-}
-
-// Error logs an error message
-func Error(msg string, args ...any) {
-	if Log != nil {
-		Log.Error(msg, args...)
-	}
-}
-
-// Warn logs a warning message
-func Warn(msg string, args ...any) {
-	if Log != nil {
-		Log.Warn(msg, args...)
-	}
 }
 
 // Debug logs a debug message
@@ -152,10 +253,20 @@ func Debug(msg string, args ...any) {
 	}
 }
 
-// Fatal logs a fatal message and exits
+// Fatal logs a fatal message at ERROR+4 level and exits
+// FATAL indicates critical errors that cause application crash
 func Fatal(msg string, args ...any) {
 	if Log != nil {
-		Log.Error(msg, args...)
+		// Log at ERROR+4 level (equivalent to FATAL/CRITICAL)
+		Log.Log(context.Background(), slog.LevelError+4, msg, args...)
+	}
+	os.Exit(1)
+}
+
+// FatalCtx logs a fatal message with trace context and exits
+func FatalCtx(ctx context.Context, msg string, args ...any) {
+	if Log != nil {
+		WithContext(ctx).Log(ctx, slog.LevelError+4, msg, args...)
 	}
 	os.Exit(1)
 }
@@ -236,4 +347,77 @@ func (m *multiHandler) WithGroup(name string) slog.Handler {
 		newHandlers[i] = h.WithGroup(name)
 	}
 	return &multiHandler{handlers: newHandlers}
+}
+
+// Application log helpers - for startup, shutdown, errors
+// These will have log_type="application" for filtering in Loki
+
+func AppInfo(msg string, args ...any) {
+	if Log != nil {
+		Log.Info(msg, append(args, "log_type", "application")...)
+	}
+}
+
+func AppError(msg string, args ...any) {
+	if Log != nil {
+		Log.Error(msg, append(args, "log_type", "application")...)
+	}
+}
+
+func AppWarn(msg string, args ...any) {
+	if Log != nil {
+		Log.Warn(msg, append(args, "log_type", "application")...)
+	}
+}
+
+// Request log helpers - for HTTP request/response logs
+// These will have log_type="request" for filtering in Loki
+
+func RequestInfo(msg string, args ...any) {
+	if Log != nil {
+		Log.Info(msg, append(args, "log_type", "request")...)
+	}
+}
+
+func RequestError(msg string, args ...any) {
+	if Log != nil {
+		Log.Error(msg, append(args, "log_type", "request")...)
+	}
+}
+
+func RequestWarn(msg string, args ...any) {
+	if Log != nil {
+		Log.Warn(msg, append(args, "log_type", "request")...)
+	}
+}
+
+// RequestLogger creates a logger with HTTP request context
+// Includes: method, path, remote_addr, user_agent, request_id
+func RequestLogger(ctx context.Context, method, path, remoteAddr, userAgent, requestID string) *slog.Logger {
+	logger := WithContext(ctx).With(
+		"method", method,
+		"path", path,
+		"remote_addr", remoteAddr,
+		"user_agent", userAgent,
+		"request_id", requestID,
+	)
+	return logger
+}
+
+// GRPCLogger creates a logger with gRPC context
+// Includes: grpc_method, peer_addr
+func GRPCLogger(ctx context.Context, method, peerAddr string) *slog.Logger {
+	logger := WithContext(ctx).With(
+		"grpc_method", method,
+		"peer_addr", peerAddr,
+		"protocol", "grpc",
+	)
+	return logger
+}
+
+// ErrorWithStack logs error with full context and stack trace hint
+func ErrorWithStack(ctx context.Context, msg string, err error, extraFields ...any) {
+	fields := []any{"error", err.Error()}
+	fields = append(fields, extraFields...)
+	WithContext(ctx).ErrorContext(ctx, msg, fields...)
 }

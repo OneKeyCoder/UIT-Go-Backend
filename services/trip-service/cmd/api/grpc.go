@@ -8,9 +8,10 @@ import (
 	"trip-service/internal/models"
 	"trip-service/internal/repository"
 
-	"github.com/OneKeyCoder/UIT-Go-Backend/common/grpcutil"
+
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/logger"
 	pb "github.com/OneKeyCoder/UIT-Go-Backend/proto/trip"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -21,7 +22,7 @@ type TripServer struct {
 }
 
 func (s *TripServer) CreateTrip(ctx context.Context, req *pb.CreateTripRequest) (*pb.CreateTripResponse, error) {
-	logger.Info("Create Trip via gRPC",
+	logger.AppInfo("Create Trip via gRPC",
 		"userID", strconv.Itoa(int(req.PassengerId)),
 	)
 	newTrip := repository.NewTripDTO{
@@ -32,7 +33,7 @@ func (s *TripServer) CreateTrip(ctx context.Context, req *pb.CreateTripRequest) 
 		DestLng:       req.DestLng,
 		PaymentMethod: req.PaymentMethod,
 	}
-	tripRecord, duration, err := s.Config.TripService.CreateTrip(newTrip)
+	tripRecord, duration, err := s.Config.TripService.CreateTrip(ctx, newTrip)
 	if err != nil {
 		logger.Error("Failed to create trip via gRPC", "error", err)
 		return nil, err
@@ -350,7 +351,7 @@ func (app *Config) StartGRPCServer() error {
 	}
 
 	grpcServer := grpc.NewServer(
-		grpc.UnaryInterceptor(grpcutil.UnaryServerInterceptor()),
+		grpc.StatsHandler(otelgrpc.NewServerHandler()),
 	)
 
 	tripServer := &TripServer{

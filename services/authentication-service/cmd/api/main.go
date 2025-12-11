@@ -17,11 +17,13 @@ import (
 
 	"github.com/Azure/go-amqp"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/env"
-	"github.com/OneKeyCoder/UIT-Go-Backend/common/grpcutil"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/logger"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/rabbitmq"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/telemetry"
 	userpb "github.com/OneKeyCoder/UIT-Go-Backend/proto/user"
+	"github.com/XSAM/otelsql"
+	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -37,6 +39,7 @@ type Config struct {
 	JWTExpiry     time.Duration
 	RefreshExpiry time.Duration
 	RabbitConn    *amqp.Conn
+	RabbitSession *amqp.Session // Reusable session for publishing
 	UserClient    userpb.UserServiceClient
 }
 
@@ -52,6 +55,20 @@ func main() {
 			defer cancel()
 			if err := shutdown(ctx); err != nil {
 				logger.Error("Failed to shutdown tracer", "error", err)
+			}
+		}()
+	}
+
+	// Initialize metrics (OTLP push to Alloy)
+	shutdownMetrics, err := telemetry.InitMetrics("authentication-service", "1.0.0")
+	if err != nil {
+		fmt.Printf("Failed to initialize metrics: %v\n", err)
+	} else {
+		defer func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := shutdownMetrics(ctx); err != nil {
+				logger.Error("Failed to shutdown metrics", "error", err)
 			}
 		}()
 	}
@@ -89,11 +106,28 @@ func main() {
 
 	// Connect to RabbitMQ
 	rabbitConn, err := rabbitmq.ConnectSimple(env.RabbitMQURL())
+	var rabbitSession *amqp.Session
 	if err != nil {
 		logger.Error("Failed to connect to RabbitMQ, continuing without events", "error", err)
 	} else {
 		logger.Info("Connected to RabbitMQ")
+
+		// Create a reusable session for publishing (reduce overhead)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		rabbitSession, err = rabbitConn.NewSession(ctx, nil)
+		cancel()
+		if err != nil {
+			logger.Error("Failed to create RabbitMQ session", "error", err)
+		} else {
+			logger.Info("Created RabbitMQ session for publishing")
+		}
+
 		defer func() {
+			if rabbitSession != nil {
+				if err := rabbitSession.Close(context.Background()); err != nil {
+					logger.Error("Error closing RabbitMQ session", "error", err)
+				}
+			}
 			if err := rabbitConn.Close(); err != nil {
 				logger.Error("Error closing RabbitMQ connection", "error", err)
 			}
@@ -104,7 +138,7 @@ func main() {
 	userConn, err := grpc.NewClient(
 		"user-service:50055",
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithUnaryInterceptor(grpcutil.UnaryClientInterceptor()),
+		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
 	)
 	if err != nil {
 		logger.Error("Failed to connect to user-service", "error", err)
@@ -123,6 +157,7 @@ func main() {
 		JWTExpiry:     jwtExpiry,
 		RefreshExpiry: refreshExpiry,
 		RabbitConn:    rabbitConn,
+		RabbitSession: rabbitSession,
 		UserClient:    userClient,
 	}
 
@@ -170,9 +205,27 @@ func main() {
 }
 
 func openDB(dsn string) (*sql.DB, error) {
-	db, err := sql.Open("pgx", dsn)
+	// Use otelsql for automatic PostgreSQL tracing
+	db, err := otelsql.Open("pgx", dsn,
+		otelsql.WithAttributes(semconv.DBSystemPostgreSQL),
+		otelsql.WithSpanOptions(otelsql.SpanOptions{
+			Ping:                 true, // Trace connection.Ping
+			RowsNext:             true, // Trace rows.Next
+			DisableErrSkip:       true, // Record all errors
+			OmitConnResetSession: false, // Include reset session
+			OmitConnPrepare:      false, // Include prepare statements
+			OmitConnQuery:        false, // Include queries
+			OmitRows:             false, // Include row operations
+			OmitConnectorConnect: false, // Include connector.Connect
+		}),
+	)
 	if err != nil {
 		return nil, err
+	}
+
+	// Register DB stats metrics
+	if err := otelsql.RegisterDBStatsMetrics(db, otelsql.WithAttributes(semconv.DBSystemPostgreSQL)); err != nil {
+		logger.Warn("Failed to register DB stats", "error", err)
 	}
 
 	// Connection pooling configuration

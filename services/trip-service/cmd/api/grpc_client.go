@@ -5,9 +5,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/OneKeyCoder/UIT-Go-Backend/common/grpcutil"
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/logger"
 	locationpb "github.com/OneKeyCoder/UIT-Go-Backend/proto/location"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -20,7 +20,7 @@ func (grpcClients *GRPCClients) InitGRPCClients() (*GRPCClients, error) {
 	locationConn, err := grpc.NewClient(
 		"location-service:50053",
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithUnaryInterceptor(grpcutil.UnaryClientInterceptor()),
+		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
 	)
 	if err != nil {
 		logger.Error("Failed to connect to location service", "error", err)

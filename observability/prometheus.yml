@@ -2,20 +2,22 @@
 # Production-ready configuration with proper scrape intervals and alert rules
 
 global:
-  scrape_interval: 15s      # How often to scrape targets
-  evaluation_interval: 15s   # How often to evaluate rules
-  scrape_timeout: 10s       # Timeout for scrape requests
-  
+  scrape_interval: 15s # How often to scrape targets
+  evaluation_interval: 15s # How often to evaluate rules
+  scrape_timeout: 10s # Timeout for scrape requests
+
   # External labels for identifying this Prometheus instance
   external_labels:
-    cluster: 'uit-go-local'
-    environment: 'development'
+    cluster: "uit-go-local"
+    environment: "development"
 
-# Alertmanager configuration (for future integration)
-# alerting:
-#   alertmanagers:
-#     - static_configs:
-#         - targets: ['alertmanager:9093']
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
+      timeout: 10s
+      api_version: v2
 
 # Rule files for alerts
 rule_files:
@@ -23,90 +25,28 @@ rule_files:
 
 # Scrape configurations
 scrape_configs:
-  # Self-monitoring
-  - job_name: 'prometheus'
+  # Self-monitoring - Prometheus itself
+  - job_name: "prometheus"
     static_configs:
-      - targets: ['localhost:9090']
+      - targets: ["localhost:9090"]
     metrics_path: /metrics
 
-  # API Gateway - main entry point
-  - job_name: 'api-gateway'
+  # Observability stack monitoring
+  - job_name: "loki"
     static_configs:
-      - targets: ['api-gateway:80']
-    metrics_path: /metrics
-    # Relabel to add service name
-    relabel_configs:
-      - source_labels: [__address__]
-        target_label: instance
-      - target_label: service
-        replacement: api-gateway
-
-  # Authentication Service
-  - job_name: 'authentication-service'
-    static_configs:
-      - targets: ['authentication-service:80']
-    metrics_path: /metrics
-    relabel_configs:
-      - source_labels: [__address__]
-        target_label: instance
-      - target_label: service
-        replacement: authentication-service
-
-  # Logger Service
-  - job_name: 'logger-service'
-    static_configs:
-      - targets: ['logger-service:80']
-    metrics_path: /metrics
-    relabel_configs:
-      - source_labels: [__address__]
-        target_label: instance
-      - target_label: service
-        replacement: logger-service
-
-  # Location Service
-  - job_name: 'location-service'
-    static_configs:
-      - targets: ['location-service:80']
-    metrics_path: /metrics
-    relabel_configs:
-      - source_labels: [__address__]
-        target_label: instance
-      - target_label: service
-        replacement: location-service
-
-  # Trip Service
-  - job_name: 'trip-service'
-    static_configs:
-      - targets: ['trip-service:80']
-    metrics_path: /metrics
-    relabel_configs:
-      - source_labels: [__address__]
-        target_label: instance
-      - target_label: service
-        replacement: trip-service
-
-  # User Service
-  - job_name: 'user-service'
-    static_configs:
-      - targets: ['user-service:80']
-    metrics_path: /metrics
-    relabel_configs:
-      - source_labels: [__address__]
-        target_label: instance
-      - target_label: service
-        replacement: user-service
-
-  # Jaeger - for tracing infrastructure health
-  - job_name: 'jaeger'
-    static_configs:
-      - targets: ['jaeger:8888']
+      - targets: ["loki:3100"]
     metrics_path: /metrics
 
-  # Loki - for logging infrastructure health
-  - job_name: 'loki'
+  - job_name: "tempo"
     static_configs:
-      - targets: ['loki:3100']
+      - targets: ["tempo:3200"]
     metrics_path: /metrics
+
+  # NOTE: Application services (api-gateway, authentication-service, etc.) 
+  # now use OTLP push metrics to Alloy instead of Prometheus scraping.
+  # Alloy receives OTLP metrics on port 4317/4318 and forwards to Prometheus
+  # via remote write API. This eliminates the need for service discovery
+  # and is required for Azure Container Apps deployment.
 
   # Redis Exporter (if added)
   # - job_name: 'redis'
