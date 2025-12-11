@@ -347,8 +347,11 @@ func InitMetrics(serviceName, serviceVersion string) (func(context.Context) erro
 			if err != nil {
 				return nil, err
 			}
+			// PeriodicReader with 15s interval for Grafana Cloud
 			mp = sdkmetric.NewMeterProvider(
-				sdkmetric.WithReader(sdkmetric.NewPeriodicReader(metricExporter)),
+				sdkmetric.WithReader(sdkmetric.NewPeriodicReader(metricExporter,
+					sdkmetric.WithInterval(15*time.Second),
+				)),
 				sdkmetric.WithResource(res),
 			)
 		} else {
@@ -358,7 +361,9 @@ func InitMetrics(serviceName, serviceVersion string) (func(context.Context) erro
 				return nil, err
 			}
 			mp = sdkmetric.NewMeterProvider(
-				sdkmetric.WithReader(sdkmetric.NewPeriodicReader(metricExporter)),
+				sdkmetric.WithReader(sdkmetric.NewPeriodicReader(metricExporter,
+					sdkmetric.WithInterval(15*time.Second),
+				)),
 				sdkmetric.WithResource(res),
 			)
 		}

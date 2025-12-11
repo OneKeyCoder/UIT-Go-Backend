@@ -13,10 +13,14 @@ import (
 	pb "github.com/OneKeyCoder/UIT-Go-Backend/proto/auth"
 	userpb "github.com/OneKeyCoder/UIT-Go-Backend/proto/user"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
+
+var tracer = otel.Tracer("authentication-service")
 
 // AuthServer implements the gRPC AuthService
 type AuthServer struct {
@@ -50,7 +54,13 @@ func (s *AuthServer) Register(ctx context.Context, req *pb.RegisterRequest) (*pb
 
 	// Create user in user-service via gRPC
 	if s.Config.UserClient != nil {
-		userCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		replicateCtx, replicateSpan := tracer.Start(ctx, "replicate_to_user_service")
+		replicateSpan.SetAttributes(
+			attribute.String("target_service", "user-service"),
+			attribute.String("operation", "create_user_replica"),
+		)
+		
+		userCtx, cancel := context.WithTimeout(replicateCtx, 5*time.Second)
 		defer cancel()
 
 		_, err = s.Config.UserClient.CreateUser(userCtx, &userpb.CreateUserRequest{
@@ -63,8 +73,10 @@ func (s *AuthServer) Register(ctx context.Context, req *pb.RegisterRequest) (*pb
 				"email", req.Email,
 				"error", err,
 			)
+			replicateSpan.RecordError(err)
 			// Don't fail registration if user-service is down
 		}
+		replicateSpan.End()
 	}
 
 	// Get the created user

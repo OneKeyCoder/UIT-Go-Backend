@@ -38,7 +38,7 @@ groups:
             1. Check recent deployments
             2. Review Tempo traces for failing requests
             3. Check dependent service health
-          runbook_url: "https://github.com/OneKeyCoder/UIT-Go-Backend/blob/master/docs/runbooks/high-error-rate.md"
+          runbook_url: "https://github.com/OneKeyCoder/UIT-Go-Backend/blob/master/observability/runbooks/high-error-rate.md"
 
       # Slow burn: 3x burn rate over 6h = 12.5% budget consumed
       - alert: SLO_HighErrorRate_SlowBurn
@@ -110,6 +110,7 @@ groups:
             1. Check Tempo for slow traces
             2. Review downstream service latencies
             3. Check for resource contention (CPU/Memory)
+          runbook_url: "https://github.com/OneKeyCoder/UIT-Go-Backend/blob/master/observability/runbooks/high-latency.md"
 
       # Driver Search P95 > 200ms
       - alert: SLO_HighLatency_DriverSearch
@@ -132,6 +133,7 @@ groups:
             1. Check Redis performance
             2. Review GEO query patterns
             3. Check for hot spots in location data
+          runbook_url: "https://github.com/OneKeyCoder/UIT-Go-Backend/blob/master/observability/runbooks/high-latency.md"
 
       # Authentication P95 > 100ms
       - alert: SLO_HighLatency_Auth
@@ -154,6 +156,7 @@ groups:
             1. Check PostgreSQL query performance
             2. Review bcrypt cost factor
             3. Check JWT signing/validation time
+          runbook_url: "https://github.com/OneKeyCoder/UIT-Go-Backend/blob/master/observability/runbooks/high-latency.md"
 
   # ==========================================
   # Service Health Alerts

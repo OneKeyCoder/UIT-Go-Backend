@@ -42,6 +42,18 @@ scrape_configs:
       - targets: ["tempo:3200"]
     metrics_path: /metrics
 
+  # RabbitMQ - message queue metrics from management plugin
+  - job_name: 'rabbitmq'
+    static_configs:
+      - targets: ['rabbitmq:15672']
+    metrics_path: /metrics
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+      - target_label: service
+        replacement: rabbitmq
+
+
   # NOTE: Application services (api-gateway, authentication-service, etc.) 
   # now use OTLP push metrics to Alloy instead of Prometheus scraping.
   # Alloy receives OTLP metrics on port 4317/4318 and forwards to Prometheus

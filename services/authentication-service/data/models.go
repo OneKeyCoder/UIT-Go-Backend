@@ -8,6 +8,8 @@ import (
 
 	"github.com/OneKeyCoder/UIT-Go-Backend/common/logger"
 	"golang.org/x/crypto/bcrypt"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 const dbTimeout = time.Second * 3
@@ -205,7 +207,15 @@ func (u *User) Insert(parentCtx context.Context, user User) (int, error) {
 	ctx, cancel := context.WithTimeout(parentCtx, dbTimeout)
 	defer cancel()
 
+	// Trace bcrypt hashing operation (expensive CPU operation)
+	tracer := otel.Tracer("authentication-service")
+	_, hashSpan := tracer.Start(parentCtx, "bcrypt.GenerateFromPassword")
+	hashSpan.SetAttributes(
+		attribute.String("operation", "password_hash"),
+		attribute.Int("cost", 12),
+	)
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), 12)
+	hashSpan.End()
 	if err != nil {
 		return 0, err
 	}
@@ -255,7 +265,15 @@ func (u *User) ResetPassword(password string) error {
 // with the hash we have stored for a given user in the database. If the password
 // and hash match, we return true; otherwise, we return false.
 func (u *User) PasswordMatches(plainText string) (bool, error) {
+	// Trace bcrypt comparison (expensive CPU operation)
+	tracer := otel.Tracer("authentication-service")
+	_, compareSpan := tracer.Start(context.Background(), "bcrypt.CompareHashAndPassword")
+	compareSpan.SetAttributes(
+		attribute.String("operation", "password_verify"),
+	)
 	err := bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(plainText))
+	compareSpan.End()
+	
 	if err != nil {
 		switch {
 		case errors.Is(err, bcrypt.ErrMismatchedHashAndPassword):
