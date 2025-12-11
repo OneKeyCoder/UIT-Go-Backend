@@ -38,8 +38,8 @@ resource "azurerm_storage_share" "loki" {
   quota                = 20
 }
 
-resource "azurerm_storage_share" "jaeger" {
-  name                 = "jaeger-data"
+resource "azurerm_storage_share" "tempo" {
+  name                 = "tempo-data"
   storage_account_id   = azurerm_storage_account.observability.id
   quota                = 10
 }

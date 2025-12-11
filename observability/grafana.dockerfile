@@ -1,5 +1,4 @@
 # Custom Grafana image with baked-in provisioning for Azure Container Apps
-# ACA doesn't support bind mounts, so we copy provisioning files into the image
 
 FROM grafana/grafana:12.2.3
 
@@ -7,7 +6,7 @@ FROM grafana/grafana:12.2.3
 COPY grafana/provisioning /etc/grafana/provisioning
 
 # Environment variables for Azure deployment
-ENV GF_SERVER_ROOT_URL=https://grafana.yourdomain.com
+ENV GF_SERVER_ROOT_URL=${GF_SERVER_ROOT_URL}
 ENV GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
 
 # Disable analytics

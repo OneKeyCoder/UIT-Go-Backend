@@ -3,3 +3,7 @@
 output "public_ip_address" {
   value = module.app-gw.public_ip_address
 }
+
+output "acr_name" {
+  value = module.acr.name
+}

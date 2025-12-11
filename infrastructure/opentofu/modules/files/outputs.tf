@@ -24,9 +24,9 @@ output "loki_share_name" {
   value       = azurerm_storage_share.loki.name
 }
 
-output "jaeger_share_name" {
+output "tempo_share_name" {
   description = "Name of the Jaeger data share"
-  value       = azurerm_storage_share.jaeger.name
+  value       = azurerm_storage_share.tempo.name
 }
 
 # Configuration share name

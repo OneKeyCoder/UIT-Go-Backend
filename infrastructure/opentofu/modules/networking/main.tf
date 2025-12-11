@@ -26,6 +26,7 @@ resource "azurerm_subnet" "aca" {
     "Microsoft.KeyVault",
     "Microsoft.ContainerRegistry",
     "Microsoft.ServiceBus",
+    "Microsoft.Storage"
   ]
 }
 

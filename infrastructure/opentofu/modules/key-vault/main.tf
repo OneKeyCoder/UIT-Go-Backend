@@ -45,6 +45,7 @@ resource "azurerm_role_assignment" "aca_kv_reader" {
   scope                = azurerm_key_vault.keyvault.id
   role_definition_name = "Key Vault Secrets User"
   principal_id         = azurerm_user_assigned_identity.apps.principal_id
+  depends_on = [ azurerm_role_assignment.terraform_kv_officer ]
 }
 
 # Application secrets - these should be rotated in production

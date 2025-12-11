@@ -6,7 +6,7 @@ output "id" {
   value = azurerm_key_vault.keyvault.id
 }
 
-output "access-identity" {
+output "access_identity_id" {
   value = azurerm_user_assigned_identity.apps.id
 }
 
