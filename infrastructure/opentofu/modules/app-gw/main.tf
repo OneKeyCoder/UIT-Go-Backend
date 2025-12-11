@@ -95,11 +95,13 @@ resource "azurerm_application_gateway" "app_gw" {
     http_listener_name = "api-listener"
     rewrite_rule_set_name = local.preserve_host_ruleset
     backend_http_settings_name = local.default_http_backend_setting
+    backend_address_pool_name = "api-pool"
+    priority = 100
   }
 
   # monitor endpoint
   backend_address_pool {
-    name = "grafana-pool"
+    name = "monitor-pool"
     fqdns = [var.monitor_aca_fqdn]
   }
   http_listener {
@@ -116,5 +118,7 @@ resource "azurerm_application_gateway" "app_gw" {
     http_listener_name = "monitor-listener"
     rewrite_rule_set_name = local.preserve_host_ruleset
     backend_http_settings_name = local.default_http_backend_setting
+    backend_address_pool_name = "monitor-pool"
+    priority = 110
   }
 }

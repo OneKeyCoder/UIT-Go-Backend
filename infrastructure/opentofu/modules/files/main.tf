@@ -1,3 +1,10 @@
+# Get current client configuration
+data "azurerm_client_config" "current" {}
+
+data "http" "my_ip" {
+  url = "https://api.ipify.org"
+}
+
 resource "random_string" "storage_account_name" {
   length = 6
   lower = true
@@ -17,6 +24,8 @@ resource "azurerm_storage_account" "observability" {
     default_action = "Deny"
     bypass         = ["AzureServices"]
     virtual_network_subnet_ids = var.allowed_subnet_ids
+    # Allow current client IP for Terraform file uploads
+    ip_rules       = [data.http.my_ip.response_body]
   }
 }
 
@@ -53,4 +62,11 @@ resource "azurerm_key_vault_secret" "storage_key" {
   lifecycle {
     ignore_changes = [value]
   }
+}
+
+# Grant current user permissions to upload files
+resource "azurerm_role_assignment" "current_user_file_contributor" {
+  scope                = azurerm_storage_account.observability.id
+  role_definition_name = "Storage File Data SMB Share Contributor"
+  principal_id         = data.azurerm_client_config.current.object_id
 }
