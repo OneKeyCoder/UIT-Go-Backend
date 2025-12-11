@@ -19,7 +19,7 @@ resource "azurerm_subnet" "aca" {
     name = "aca-delegation"
     service_delegation {
       name = "Microsoft.App/environments"
-      actions = ["Microsoft.Network/virtualNetworks/subnets/action"]
+      actions = ["Microsoft.Network/virtualNetworks/subnets/join/action"]
     }
   }
   service_endpoints = [
@@ -47,9 +47,13 @@ resource "azurerm_subnet" "postgres" {
     name = "postgres-delegation"
     service_delegation {
       name = "Microsoft.DBforPostgreSQL/flexibleServers"
-      actions = ["Microsoft.Network/virtualNetworks/subnets/action"]
+      actions = ["Microsoft.Network/virtualNetworks/subnets/join/action"]
     }
   }
+
+  service_endpoints = [
+    "Microsoft.Storage"
+  ]
 }
 
 # special subnet for private endpoints
