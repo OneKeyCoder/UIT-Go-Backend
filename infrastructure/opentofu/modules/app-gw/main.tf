@@ -16,6 +16,7 @@ locals {
     ? var.base_hostname
     : "${var.monitor_subdomain}.${var.base_hostname}")
   preserve_host_ruleset = "preserve-host-header"
+  default_http_backend_setting = "empty-http-setting"
 }
 
 resource "azurerm_application_gateway" "app_gw" {
@@ -47,7 +48,7 @@ resource "azurerm_application_gateway" "app_gw" {
 
   # Default backend http setting
   backend_http_settings {
-    name = "empty-http-setting"
+    name = local.default_http_backend_setting
     protocol = "Http"
     port = 80
     cookie_based_affinity = "Disabled"
@@ -93,6 +94,7 @@ resource "azurerm_application_gateway" "app_gw" {
     rule_type = "Basic"
     http_listener_name = "api-listener"
     rewrite_rule_set_name = local.preserve_host_ruleset
+    backend_http_settings_name = local.default_http_backend_setting
   }
 
   # monitor endpoint
@@ -113,5 +115,6 @@ resource "azurerm_application_gateway" "app_gw" {
     rule_type = "Basic"
     http_listener_name = "monitor-listener"
     rewrite_rule_set_name = local.preserve_host_ruleset
+    backend_http_settings_name = local.default_http_backend_setting
   }
 }

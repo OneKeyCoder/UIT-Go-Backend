@@ -16,7 +16,7 @@ resource "azurerm_postgresql_flexible_server" "postgres" {
   name = "${var.resource_prefix}-psql-primary"
   resource_group_name = var.resource_group_name
   location = var.location
-  version = "16"
+  version = "17"
 
   delegated_subnet_id = var.subnet_id
   private_dns_zone_id = azurerm_private_dns_zone.postgres.id
@@ -33,6 +33,10 @@ resource "azurerm_postgresql_flexible_server" "postgres" {
   # Use "General Purpose" (D-series) for production consistency. 
   # Use "Burstable" (B-series) only if cost is the #1 priority.
   sku_name = var.sku_name
+
+  lifecycle {
+    ignore_changes = [ zone ]
+  }
 }
 
 # Configuration: Enable PgBouncer
@@ -42,10 +46,11 @@ resource "azurerm_postgresql_flexible_server_configuration" "pgbouncer" {
   value     = "true"
 }
 
-resource "azurerm_postgresql_flexible_server_configuration" "pooling_mode" {
-  name      = "pgbouncer.pooling_mode"
+resource "azurerm_postgresql_flexible_server_configuration" "pool_mode" {
+  name      = "pgbouncer.pool_mode"
   server_id = azurerm_postgresql_flexible_server.postgres.id
   value     = "transaction" # 'transaction' is best for microservices
+  depends_on = [ azurerm_postgresql_flexible_server_configuration.pgbouncer ]
 }
 
 # Read Replica (Optional)

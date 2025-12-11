@@ -18,16 +18,15 @@ resource "azurerm_container_app_environment" "env" {
     workload_profile_type = "Consumption"
   }
 
-  workload_profile {
-    name                  = "Dedicated1"
-    workload_profile_type = "D4" # General Purpose, persistent
-    minimum_count         = 1    # Always keep 1 node running
-    maximum_count         = 3
-  }
-
   identity {
     type = "SystemAssigned, UserAssigned"
     identity_ids = [var.acr_pull_identity_id]
+  }
+
+  lifecycle {
+    ignore_changes = [
+      infrastructure_resource_group_name,
+    ]
   }
 }
 

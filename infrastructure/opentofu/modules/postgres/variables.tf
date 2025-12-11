@@ -43,7 +43,7 @@ variable "admin_password_version" {
 variable "sku_name" {
   description = "Compute size SKU"
   type = string
-  default = "GP_Standard_D4ads_v5"
+  default = "GP_Standard_D4ds_v5"
 }
 
 variable "key_vault_id" {

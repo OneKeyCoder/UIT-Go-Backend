@@ -20,9 +20,15 @@ resource "azurerm_container_app" "go-services" {
   dynamic "secret" {
     for_each = var.secrets
     content {
-      name = secret.key
+      name = replace(lower(secret.key), "_", "-")
       key_vault_secret_id = secret.value
+      identity = var.key_vault_access_identity_id
     }
+  }
+
+  identity {
+    type = "SystemAssigned, UserAssigned"
+    identity_ids = [var.key_vault_access_identity_id, var.acr_pull_identity_id]
   }
 
   template {
@@ -45,7 +51,7 @@ resource "azurerm_container_app" "go-services" {
         }
       }
       dynamic "readiness_probe" {
-        for_each = var.liveness_probe != null ? [var.liveness_probe] : []
+        for_each = var.readiness_probe != null ? [var.readiness_probe] : []
         iterator = i
         content {
           transport             = i.value.transport
@@ -69,7 +75,7 @@ resource "azurerm_container_app" "go-services" {
         for_each = var.secrets
         content {
           name = env.key
-          secret_name = env.key
+          secret_name = replace(lower(env.key), "_", "-")
         }
       }
     }

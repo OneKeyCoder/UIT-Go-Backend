@@ -7,11 +7,11 @@ output "hostname" {
 }
 
 output "kv_primary_access_key_id" {
-  value = azurerm_key_vault_secret.primary.resource_versionless_id
+  value = azurerm_key_vault_secret.primary.versionless_id
 }
 
 output "kv_secondary_access_key_id" {
-  value = azurerm_key_vault_secret.secondary.resource_versionless_id
+  value = azurerm_key_vault_secret.secondary.versionless_id
 }
 
 output "port" {

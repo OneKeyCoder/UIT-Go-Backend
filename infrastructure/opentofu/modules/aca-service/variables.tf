@@ -18,6 +18,9 @@ variable "acr_login_server" {
 variable "acr_pull_identity_id" {
   type = string
 }
+variable "key_vault_access_identity_id" {
+  type = string
+}
 
 variable "image_name" {
   description = "image name to pull, defaults to the container app name"
