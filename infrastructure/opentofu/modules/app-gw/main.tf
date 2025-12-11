@@ -49,10 +49,11 @@ resource "azurerm_application_gateway" "app_gw" {
   # Default backend http setting
   backend_http_settings {
     name = local.default_http_backend_setting
-    protocol = "Http"
-    port = 80
+    protocol = "Https"
+    port = 443
     cookie_based_affinity = "Disabled"
     dedicated_backend_connection_enabled = false
+    pick_host_name_from_backend_address = true
     request_timeout = var.request_timeout
   }
 
@@ -81,6 +82,25 @@ resource "azurerm_application_gateway" "app_gw" {
     name = "api-pool"
     fqdns = [var.api_aca_fqdn]
   }
+  backend_http_settings {
+    name = "api-http-settings"
+    protocol = "Https"
+    port = 443
+    cookie_based_affinity = "Disabled"
+    dedicated_backend_connection_enabled = false
+    request_timeout = var.request_timeout
+    pick_host_name_from_backend_address = true
+    probe_name = "api-probe"
+  }
+  probe {
+    name = "api-probe"
+    protocol = "Https"
+    pick_host_name_from_backend_http_settings = true
+    path = "/health/live"
+    interval = 30
+    timeout = 30
+    unhealthy_threshold = 3
+  }
   http_listener {
     name = "api-listener"
     frontend_ip_configuration_name = local.frontend_ip_config
@@ -94,7 +114,7 @@ resource "azurerm_application_gateway" "app_gw" {
     rule_type = "Basic"
     http_listener_name = "api-listener"
     rewrite_rule_set_name = local.preserve_host_ruleset
-    backend_http_settings_name = local.default_http_backend_setting
+    backend_http_settings_name = "api-http-settings"
     backend_address_pool_name = "api-pool"
     priority = 100
   }

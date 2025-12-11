@@ -35,6 +35,12 @@ resource "azurerm_storage_share" "prometheus" {
   quota                = 10 # 10 GB
 }
 
+resource "azurerm_storage_share" "alertmanager" {
+  name                 = "alertmanager-data"
+  storage_account_id   = azurerm_storage_account.observability.id
+  quota                = 10
+}
+
 resource "azurerm_storage_share" "grafana" {
   name                 = "grafana-data"
   storage_account_id   = azurerm_storage_account.observability.id

@@ -78,3 +78,8 @@ variable "readiness_probe" {
   })
   default = null
 }
+
+variable "min_replica" {
+  type = number
+  default = 0
+}

@@ -14,6 +14,11 @@ output "prometheus_share_name" {
   value       = azurerm_storage_share.prometheus.name
 }
 
+output "alertmanager_share_name" {
+  description = "Name of the alertmanager data share"
+  value       = azurerm_storage_share.alertmanager.name
+}
+
 output "grafana_share_name" {
   description = "Name of the Grafana data share"
   value       = azurerm_storage_share.grafana.name

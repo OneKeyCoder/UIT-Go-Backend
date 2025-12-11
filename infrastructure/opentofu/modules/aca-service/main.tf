@@ -33,6 +33,7 @@ resource "azurerm_container_app" "go-services" {
   }
 
   template {
+    min_replicas = var.min_replica
     container {
       name = var.name
       cpu = "0.5"
