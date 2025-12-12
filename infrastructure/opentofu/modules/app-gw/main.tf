@@ -141,4 +141,8 @@ resource "azurerm_application_gateway" "app_gw" {
     backend_address_pool_name = "monitor-pool"
     priority = 110
   }
+
+  lifecycle {
+    ignore_changes = [ probe ]
+  }
 }

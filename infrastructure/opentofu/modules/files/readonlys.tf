@@ -33,6 +33,7 @@ resource "azurerm_storage_share_file" "alloy_config" {
 }
 
 # Upload Jaeger configuration
+# TODO: remove this
 resource "azurerm_storage_share_file" "jaeger_config" {
   name             = "config-badger.yml"
   storage_share_url = azurerm_storage_share.configs.url

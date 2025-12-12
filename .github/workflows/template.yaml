@@ -35,10 +35,10 @@ jobs:
         uses: azure/container-apps-deploy-action@v1
         with:
           appSourcePath: ${{ github.workspace }}/services
-          acrName: testcipipeline ## thay bằng cái thực giúp
+          acrName: se360uitgo
           acrUsername: ${{ secrets.REGISTRY_USERNAME }}
-          resourceGroup: test-uit-go ## y chang
+          resourceGroup: uit-go
           containerAppName: ${{ inputs.app-name }}
           acrPassword: ${{ secrets.REGISTRY_PASSWORD }}
-          containerAppEnvironment: our-container-app-env ## nốt
+          containerAppEnvironment: uit-go-aca-env
           dockerfilePath: ${{ inputs.dockerfile-path }}

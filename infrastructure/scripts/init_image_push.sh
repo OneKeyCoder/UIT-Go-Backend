@@ -32,7 +32,9 @@ DOCKER_COMMAND=$cmd az acr login --name $ACR_NAME
 
 $cmd compose build
 
-services=("api-gateway" "logger-service" "authentication-service" "location-service" "trip-service" "user-service")
+$cmd build -f observability/grafana.dockerfile -t grafana-custom:latest observability
+
+services=("api-gateway" "logger-service" "authentication-service" "location-service" "trip-service" "user-service", "grafana-custom")
 
 # Push each service to ACR
 for service in "${services[@]}"; do
