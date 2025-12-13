@@ -239,138 +239,253 @@ We picked the build-inline option, which involves using `null_resource` to trigg
 This is hacky, but the other option is to use a dummy image and update later with CI/CD, which can overwrite when we do `tf apply` so in my opinion even more hacky. This is the state of Terraform. This is not a good state. But what can we do?
 
 ### Cost calculation and optimization
-We used the **Azure Pricing Calculator** to estimate our monthly costs.
 
-#### Calculation Assumptions (10k users):
-- Peak concurrent users: 1,500-2,500 (15-25% of total users) - higher during peak hours
-- Peak concurrent trips: 300-500 concurrent trips (3-5% of users are on an active trip)
-- Request rate: 80-150 requests/user/day (higher due to location updates)
-- Data transfer: 8-15GB/day.
-- Region: Southeast Asia
-- During peak hours, 10k users simultaneously, each user sending at least 1 request per second on average (for location updates). Peak hours last 2 hours in the afternoon and 2 hours in the morning. Thus, during each peak hour, the application must handle 10,000 requests per second.
+We used the **Azure Pricing Calculator** to estimate our monthly costs based on a realistic workload analysis.
 
-#### Networking
+#### System Overview (8,000 customers + 2,000 drivers):
 
-- **Application Gateway**: $195.64/month at Standard V2 tier, including 730 fixed gateway hours, 1 compute unit, 1000 persistent connections, 1 mb/s throughput, and 100 GB data transfer.  
-  Note: Can be scaled.  
-  Scale from 1 compute - 2,500 Persistent Connections - Throughput 2.22 mb/s  
-  Scale to 10 compute - 25,000 Persistent Connections - Throughput 22.2 mb/s  
-  Estimated Price: $219.00/month
+The system operates with three distinct traffic patterns:
+- **Peak Hours** (06:30-08:00 & 16:00-18:00): 4 hours daily, 120 hours/month
+- **Off-Peak Hours** (Business hours): 13.5 hours daily, 405 hours/month  
+- **Night Time** (22:00-05:00): 7 hours daily, 210 hours/month
 
-- **Azure DNS (DNS ACA)**: $40.50/month, including 1 hosted DNS zone and 100 million DNS queries.
+#### Traffic Analysis:
 
-- **Azure DNS (DNS Postgres)**: $40.50/month, including 1 hosted DNS zone and 100 million DNS queries.
+**Peak Hours (~3,591 RPS)**
+- 90% drivers online (1,800 drivers)
+- 20% customers online (1,600 customers)
+- Driver location pings: 1,800 RPS
+- Customer location pings: 1,600 RPS
+- Nearby driver queries: 160 RPS
+- Booking requests: 20-30 RPS
 
-- **Load Balancer (Internal load balancer)**: Free at Basic tier.
+**Off-Peak Hours (~977 RPS)**
+- 70% drivers online (1,400 drivers)
+- 2% customers online (160 customers)
+- Driver location pings: 800 RPS
+- Customer location pings: 160 RPS
+- Nearby driver queries: 16 RPS
+- Booking requests: 1-2 RPS
 
-- **Azure DNS (DNS Key Vault)**: $40.50/month, including 1 hosted DNS zone and 100 million DNS queries.
+**Night Time (~245 RPS)**
+- 10% drivers online (200 drivers)
+- 0.5% customers online (40 customers)
+- Driver location pings: 200 RPS
+- Customer location pings: 40 RPS
+- Nearby driver queries: 4 RPS
 
-#### Azure Container Apps
+#### Networking ($137.58/month)
 
-- **Location Service**: $52.35/month, Consumption plan, 0 million requests, 2 vCPUs, 4 GiB memory, 1 minimum replica.
+**Application Gateway (Standard V2): $133.68/month**
 
-- **Trip Service**: $105.12/month, Consumption plan, 0 million requests, 2 vCPUs, 8 GiB memory, 1 minimum replica.
+The gateway operates 24/7 with auto-scaling based on Compute Units (CU). Each CU provides:
+- 50 connections per second
+- 2.22 Mbps throughput  
+- 2,500 persistent connections
 
-- **API Gateway**: $642.24/month, Consumption plan, 1500 million requests, 4 vCPUs, 8 GiB memory, 1 minimum replica.
+For 3,600 concurrent requests at peak:
+- CU for compute: 3,600 CPS ÷ 50 = 72 CUs
+- CU for throughput: (3,600 RPS × 5 KB × 8 bits) ÷ 2.22 Mbps ≈ 65 CUs
+- CU for persistent connections: (3,600 × 2s avg response time) ÷ 2,500 = 3 CUs
+- **Final CU**: 72 (max of above)
 
-- **Auth Service**: $52.35/month, Consumption plan, 0 million requests, 2 vCPUs, 4 GiB memory, 1 minimum replica.
+Monthly breakdown:
+- Peak hours (105h): 72 CUs × 8 instances
+- Off-peak (405h): 20 CUs × 2 instances  
+- Night time (210h): 5 CUs × 1 instance
 
-- **User Service**: $0.00/month, Consumption plan, 0 million requests, 2 vCPUs, 4 GiB memory.
+**Azure DNS: $3.90/month**
 
-- **Logger Service**: $0.00/month, Consumption plan, 0 million requests, 0.5 vCPU, 2 GiB memory.
+3 DNS zones for ACA, PostgreSQL, and Key Vault:
+- 3 hosted zones: $1.50
+- 6 million queries/month: $2.40
 
-- **Grafana**: $0.00/month, Consumption plan, 0 million requests, 0.5 vCPU, 1 GiB memory.
+DNS queries are minimal due to:
+- PostgreSQL and Key Vault connections use connection pooling (query once per replica startup)
+- Application Gateway caches DNS with 60s TTL
+- Average 30s query interval during peak
 
-- **Observability stack**: $31.54/month, Consumption plan, 0 million requests, 1 vCPU, 2 GiB memory, 1 minimum replica.
+#### Azure Container Apps ($1,183.63/month)
 
-Total for Azure Container Apps: $886.25/month.
+All services use **3-year savings plan with 17% discount**. Free tier provides 180,000 vCPU-seconds and 360,000 GiB-seconds per month per ACA.
 
-Note: The calculations above are not entirely accurate as they are from the Azure calculator and do not account for internal task computations by the services (The current calculating assume that every service have been scaled to 0 due to the "pay as you go" plan). The formula for computing costs per service is:  
-- vCPU cost: Number of vCPUs × active seconds × $0.00002822 per vCPU-s  
-- Memory cost: Number of GiB memory × active seconds × $0.00000332 per GiB-s
-- Due to the Resources: The first 180,000 vCPU-seconds each month are free.
+**Pricing:**
+- Active vCPU: $0.000024/vCPU-second
+- Active Memory: $0.000003/GiB-second
 
-##### Recalculated Costs with Assumptions
-Assuming each service has at least 1 active instance for 18 hours per day (64,800 seconds per day, or 1,944,000 seconds per month), recalculated using the formula above, accounting for free tiers (180,000 vCPU-seconds and 360,000 GiB-seconds per month per ACA).
+**Scaling strategies:**
+- **HTTP Traffic scaling**: API Gateway, Location Service, Auth Service (based on concurrent requests)
+- **Resource scaling**: Trip Service, User Service (based on CPU/Memory)
+- **Event scaling**: Logger Service (based on Service Bus queue depth)
 
-Service vCPU allocations:  
-- Location Service: 2 vCPUs  
-- Trip Service: 2 vCPUs  
-- API Gateway: 4 vCPUs  
-- Auth Service: 2 vCPUs  
-- User Service: 2 vCPUs  
-- Logger Service: 0.5 vCPUs  
-- Grafana: 0.5 vCPUs  
-- Observability stack: 1 vCPU  
+##### Service-by-Service Breakdown:
 
-Total vCPUs across all services: 14.5  
+**API Gateway (0.5 vCPU, 1 GiB):**
+- Night time (210h): 1 replica → $61.42
+- Off-peak (405h): 1 replica → $476.67
+- Peak hours (105h): 4 replicas (1,436 concurrent ÷ 400 target) → $448.88
+- **Subtotal: $986.97**
 
-Service memory allocations:  
-- Location Service: 4 GiB  
-- Trip Service: 8 GiB  
-- API Gateway: 8 GiB  
-- Auth Service: 4 GiB  
-- User Service: 4 GiB  
-- Logger Service: 2 GiB  
-- Grafana: 1 GiB  
-- Observability stack: 2 GiB  
+**Location Service (0.5 vCPU, 1 GiB):**
+- Night time: 1 replica → $11.34
+- Off-peak: 1 replica → $21.87
+- Peak hours: 1 replica → $5.67
+- **Subtotal: $38.88**
 
-Total memory across all services: 33 GiB  
+**Auth Service (0.25 vCPU, 0.5 GiB):**
+- Night time: 1 replica → $6.80
+- Off-peak: 1 replica → $13.12
+- Peak hours: 1 replica → $3.40
+- **Subtotal: $23.32**
 
-Total vCPU-seconds per month: 14.5 × 1,944,000 = 28,188,000  
-Total GiB-seconds per month: 33 × 1,944,000 = 64,152,000  
+**Trip Service (0.25-0.5 vCPU, 1 GiB):**
+- Scales on CPU load (max 50 RPS per replica before CPU > 50%)
+- Night time: 1 replica → $13.60
+- Off-peak: 1 replica → $26.24
+- Peak hours: 1 replica → $8.80
+- **Subtotal: $48.64**
 
-Free vCPU-seconds per ACA per month: 180,000  
-Free GiB-seconds per ACA per month: 360,000  
+**User Service (0.25-0.5 vCPU, 1 GiB):**
+- Scales on CPU load (max 100 RPS per replica before CPU > 50%)
+- Night time: 1 replica → $13.60
+- Off-peak: 1 replica → $26.24
+- Peak hours: 2 replicas → $13.60
+- **Subtotal: $53.44**
 
-Per service costs (after subtracting free per ACA):  
+**Logger Service (Event-based, 0.25 vCPU, 0.5 GiB):**
+- Scales on Service Bus queue depth (500 msg/s per replica)
+- Night time: 1 replica (246 msg/s) → $11.34
+- Off-peak: 2 replicas (996 msg/s) → $43.74
+- Peak hours: 8 replicas (3,630 msg/s) → $45.36
+- **Subtotal: $100.44**
 
-- **Location Service** (2 vCPUs, 4 GiB): vCPU-s = 3,888,000; Billable vCPU-s = 3,888,000 - 180,000 = 3,708,000; vCPU cost = $104.67; GiB-s = 7,776,000; Billable GiB-s = 7,776,000 - 360,000 = 7,416,000; Memory cost = $24.60; Total: $129.27  
-- **Trip Service** (2 vCPUs, 8 GiB): vCPU-s = 3,888,000; Billable = 3,708,000; vCPU cost = $104.67; GiB-s = 15,552,000; Billable = 15,192,000; Memory cost = $50.44; Total: $155.11  
-- **API Gateway** (4 vCPUs, 8 GiB): vCPU-s = 7,776,000; Billable = 7,596,000; vCPU cost = $214.47; GiB-s = 15,552,000; Billable = 15,192,000; Memory cost = $50.44; Total: $264.91  
-- **Auth Service** (2 vCPUs, 4 GiB): vCPU-s = 3,888,000; Billable = 3,708,000; vCPU cost = $104.67; GiB-s = 7,776,000; Billable = 7,416,000; Memory cost = $24.60; Total: $129.27  
-- **User Service** (2 vCPUs, 4 GiB): vCPU-s = 3,888,000; Billable = 3,708,000; vCPU cost = $104.67; GiB-s = 7,776,000; Billable = 7,416,000; Memory cost = $24.60; Total: $129.27  
-- **Logger Service** (0.5 vCPUs, 2 GiB): vCPU-s = 972,000; Billable = 972,000 - 180,000 = 792,000; vCPU cost = $22.37; GiB-s = 3,888,000; Billable = 3,888,000 - 360,000 = 3,528,000; Memory cost = $11.71; Total: $34.08  
-- **Grafana** (0.5 vCPUs, 1 GiB): vCPU-s = 972,000; Billable = 792,000; vCPU cost = $22.37; GiB-s = 1,944,000; Billable = 1,944,000 - 360,000 = 1,584,000; Memory cost = $5.26; Total: $27.63  
-- **Observability stack** (1 vCPU, 2 GiB): vCPU-s = 1,944,000; Billable = 1,944,000 - 180,000 = 1,764,000; vCPU cost = $49.79; GiB-s = 3,888,000; Billable = 3,528,000; Memory cost = $11.71; Total: $61.50  
+**Observability Stack:**
+- Alloy (0.5 vCPU, 1 GiB): $38.88
+- Loki (0.5 vCPU, 1 GiB): $38.88
+- Tempo (0.5 vCPU, 1 GiB): $38.88
+- Prometheus (0.5 vCPU, 1 GiB): $38.88
+- Grafana (0.25 vCPU, 0.5 GiB): $1.00 (scale-to-zero when not in use)
+- **Subtotal: $156.52**
 
-Total recalculated active cost: $958.25/month (after free tiers).
+**Total before discount**: $1,426.46  
+**After 17% savings plan discount**: **$1,183.63**
 
-#### Database
+#### Database ($681.70/month)
 
-- **Azure Database for PostgreSQL (db auth service)**: $538.31/month, Flexible Server, General Purpose, D4ds v6 (4 vCores), 128 GiB storage, 1000 IOPS, with High Availability.
+**Azure Database for PostgreSQL - Flexible Server:**
 
-- **Azure Database for PostgreSQL (db trip service)**: $538.31/month, Flexible Server, General Purpose, D4ds v6 (4 vCores), 128 GiB storage, 1000 IOPS, with High Availability.
+We opted for **single server mode** instead of Citus-based horizontal scaling because:
+- Multi-node clusters require expensive upfront costs
+- Sharding requires data model changes and proper sharding strategies
+- Our use case doesn't warrant horizontal scaling yet
+- Can upgrade to Citus elastic cluster when needed
+- Vertical scaling provides 99.9% SLA with near-zero downtime
 
-- **Azure DocumentDB (MongoDB, db logger service)**: $107.74/month, M10 cluster, 3 Shards, 128 GB storage, without High Availability.
+Configuration:
+- 2 instances (Auth Service, Trip Service): D4ds v6 (4 vCores), 128 GiB storage each
+- High Availability enabled with zone-redundant standby
+- **Cost**: $538.31 × 2 = **$1,076.62/month** (Not used initially due to budget - will deploy with single instance)
 
-- **Azure DocumentDB (MongoDB, db user service)**: $271.12/month, M20 cluster, 3 Shards, 128 GB storage, without High Availability.
+**Azure Managed Redis (Standard B1):**
 
-- **Azure Managed Redis (db location service)**: $794.24/month, Compute Optimized, 2 x X3 instances, with High Availability.
+- 1 GB storage (only 19.53 MB needed for 10k location records)
+- 2 vCPUs, sufficient throughput for workload
+- High Availability enabled
+- **Cost: $57.20/month**
 
-Total for Database: $2,249.72/month.
+**Azure DocumentDB for MongoDB:**
 
-Note: We understand the importance of user data, so we always have data backup in case of bad situations. At the same time, the 2 databases for trip service and location service need to be always ready at all times to support users booking trips, so we chose High Availability (the other 2 databases do not have high availability).
+Two databases without High Availability (buffer mechanism and Service Bus provide data durability):
 
-#### Additional Azure Services
+*User Service MongoDB (M20 tier):*
+- 32 GB storage (sufficient for 10k users + 6k vehicles = ~13 GB actual)
+- Always-on service (730 hours/month)
+- **Cost: $154.25/month**
 
-- **Azure Service Bus**: $100.00/month, Basic tier, 2000 million messaging operations.
+*Logger Service MongoDB (M30 tier, first month):*
+- Stores audit logs only (not location pings)
+- Monthly audit logs: 98.1 million requests × 1 KB = 91.4 GiB
+- 128 GiB storage tier
+- **First month cost: $470.00**
 
-- **Azure Key Vault**: $6.00/month, Vault with 2,000,000 operations.
+**Storage growth projection:**
 
-Total for Additional Azure Services: $106.00/month.
+| Month | Data (GiB) | Storage Tier | Cluster | Monthly Cost |
+|-------|-----------|--------------|---------|--------------|
+| 1 | 91.4 | 128 GiB | M30 | $470 |
+| 2 | 182.8 | 256 GiB | M30 | $502 |
+| 3 | 274.2 | 512 GiB | M30 | $566 |
+| 6 | 548.4 | 1 TiB | M40 | $1,205 |
+| 12 | 1096.8 | 2 TiB | M50 | $2,118 |
+| 28 | 2559.2 | 4 TiB | M60 | $4,309 |
 
-#### Module E Total Cost
+**Total Database (first month)**: **$681.70** (Note: PostgreSQL cost reduced to $0 for initial deployment, actual with HA: $1,758.32)
 
-- **Networking**: $317.14/month (Application Gateway $195.64, Azure DNS $121.50, Load Balancer $0.00)
-- **Azure Container Apps**: $958.25/month (18 hours per day)
-- **Database**: $2,249.72/month
-- **Additional Azure Services**: $106.00/month
+#### Additional Azure Services ($10.30/month)
 
-**Total Estimated Monthly Cost**: $3,631.11/month
+**Azure Service Bus (Standard tier): $10.00/month**
 
-#### Azure Pricing Calculator References
-- Networking: https://azure.com/e/5689822e50e446cb87bd831f55edd0a1
-- Azure Container Apps: https://azure.com/e/7cc01f411f674392b92729da5129515c
-- Database: https://azure.com/e/3a1155332a6746c7b3d6fae464c0df67
-- Additional Services: https://azure.com/e/c92b0f63e6564abb92a6a77b155f26b8
+Base cost $10 + $0.80 per million operations beyond free 12.5 million/month.
+
+Monthly operations breakdown:
+- Trip lifecycle events (2,000 trips/day × 12 ops/trip): 720,000 ops
+- User audit logs (10,000 users × 2 actions/day × 2 ops): 1,200,000 ops  
+- Driver status changes (2,000 drivers × 4 toggles/day × 3 ops): 720,000 ops
+- **Total: 2,640,000 ops/month** (well under 12.5M free tier)
+
+**Azure Key Vault: $0.30/month**
+
+Operations estimate:
+- Secrets read on replica startup: 200/day
+- Secrets write for updates: 10/day
+- **Total: 6,300 ops/month** (under 10,000 ops = $0.30)
+
+Key Vault is only accessed:
+- Once per replica startup (connection pooling)
+- On connection failures/restarts
+- Manual secret rotation (rare)
+
+#### Persistent Storage ($30.50/month)
+
+**Azure Block Blob Storage (Standard tier)** for observability stack persistence:
+
+*Loki & Tempo (2 instances):*
+- 10 GB each (stores only errors/critical traces)
+- 10k writes, 1k reads per month
+- **Cost: $0.25 × 2 = $0.50**
+
+*Grafana & Prometheus (2 instances):*
+- 500 GB each (time-series metrics)
+- 1M writes, 1k reads per month
+- **Cost: $15.00 × 2 = $30.00**
+
+Note: Block Blob includes free data writes and auto-scales capacity.
+
+#### Cost Optimization Strategies
+
+1. **Replica scaling**: Many small replicas > few large replicas
+2. **Min replica always = 1** (except Grafana which scales to zero)
+3. **3-year savings plan**: 17% discount on all ACA compute
+4. **Connection pooling**: Minimizes DNS/Key Vault query costs
+5. **Scale-to-zero**: Logger Service and Grafana during off-hours
+6. **Standard tiers**: Balanced performance/cost (no Premium SKUs)
+7. **No NAT Gateway**: HERE Maps SDK doesn't require static IP whitelisting (saves ~$2,000/month)
+8. **HA selective**: Only enabled for critical databases (Redis, PostgreSQL)
+
+#### Total Monthly Cost (First Month)
+
+| Category | Cost |
+|----------|------|
+| Networking | $137.58 |
+| Azure Container Apps | $1,183.63 |
+| Database | $681.70 |
+| Additional Services | $10.30 |
+| Persistent Storage | $30.50 |
+| **TOTAL** | **$2,043.71/month** |
+
+**Notes:**
+- Cost excludes PostgreSQL HA (add $1,076.62 for production-ready setup)
+- Logger Service MongoDB scales linearly with audit log volume
+- Application Gateway auto-scales based on traffic patterns
+- All services in Southeast Asia region
+- 24/7 monitoring and observability included
